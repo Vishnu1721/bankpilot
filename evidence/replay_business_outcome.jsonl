@@ -1,0 +1,6 @@
+{"timestamp": "2026-09-12T19:44:32.940869+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
+{"timestamp": "2026-09-12T19:44:32.986898+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
+{"timestamp": "2026-09-12T19:44:33.005645+00:00", "event": "step_completed", "step_id": "step_1"}
+{"timestamp": "2026-09-12T19:44:33.007228+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
+{"timestamp": "2026-09-12T19:44:33.110583+00:00", "event": "step_completed", "step_id": "step_2"}
+{"timestamp": "2026-09-12T19:44:33.119353+00:00", "event": "business_outcome", "code": "MEMBER_NOT_FOUND", "message": "Member not found"}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# macOS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Runtime-generated artifacts
+artifacts/*.json
+
+# Temporary runtime files
+tmp/
+*.log

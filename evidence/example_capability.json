@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "lookup_savings_balance",
+  "name": "Lookup Savings Balance",
+  "description": "Find a member and return their current savings balance.",
+  "application": "LegacyBank",
+  "start_url": "http://127.0.0.1:5001/",
+  "parameters": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "required": true,
+      "description": "Member number to search for."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savings_balance",
+      "type": "string",
+      "description": "Current savings balance."
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "step_1",
+      "action": "type",
+      "target": {
+        "role": "textbox",
+        "name": "Member Id",
+        "selector": "input[name=\"member_id\"]"
+      },
+      "value": "{{member_id}}",
+      "description": "Enter value into Member Id."
+    },
+    {
+      "step_id": "step_2",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Search",
+        "selector": "button[type=\"submit\"]"
+      },
+      "value": null,
+      "description": "Click Search."
+    },
+    {
+      "step_id": "step_3",
+      "action": "extract",
+      "target": null,
+      "value": "Savings Balance",
+      "description": "Extract the current savings balance."
+    }
+  ],
+  "success_condition": {
+    "type": "text_present",
+    "value": "Member Details"
+  }
+}

@@ -1,0 +1,50 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #eeeeee;
+}
+
+.header {
+    background: #1f2937;
+    color: white;
+    padding: 16px 24px;
+    font-size: 20px;
+}
+
+.container {
+    width: 700px;
+    margin: 40px auto;
+    background: white;
+    padding: 30px;
+    border: 1px solid #bbbbbb;
+}
+
+table {
+    margin: 20px 0;
+    border-collapse: collapse;
+}
+
+td {
+    padding: 10px;
+    border: 1px solid #cccccc;
+}
+
+input {
+    padding: 7px;
+    width: 220px;
+}
+
+button {
+    padding: 8px 20px;
+    cursor: pointer;
+}
+
+.error {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #aa0000;
+}
+
+.details {
+    width: 100%;
+}

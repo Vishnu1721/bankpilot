@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Manual Verification
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <header>
+        LegacyBank Administration Console
+    </header>
+
+    <main>
+
+        <div class="panel">
+
+            <h1>
+                Manual Verification Required
+            </h1>
+
+            <p>
+                Member {{ member_id }} requires
+                operator verification before account
+                information can be displayed.
+            </p>
+
+            <p>
+                Automated systems must not complete
+                this verification step.
+            </p>
+
+            <form
+                method="POST"
+                action="{{ url_for(
+                    'verify_member',
+                    member_id=member_id
+                ) }}"
+            >
+
+                <button
+                    type="submit"
+                    name="manual_verification"
+                >
+                    Complete Verification
+                </button>
+
+            </form>
+
+        </div>
+
+    </main>
+
+</body>
+
+</html>

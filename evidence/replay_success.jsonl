@@ -1,0 +1,9 @@
+{"timestamp": "2026-09-12T19:44:08.642263+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
+{"timestamp": "2026-09-12T19:44:08.687743+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
+{"timestamp": "2026-09-12T19:44:08.707742+00:00", "event": "step_completed", "step_id": "step_1"}
+{"timestamp": "2026-09-12T19:44:08.709809+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
+{"timestamp": "2026-09-12T19:44:08.805730+00:00", "event": "step_completed", "step_id": "step_2"}
+{"timestamp": "2026-09-12T19:44:08.813487+00:00", "event": "step_started", "step_id": "step_3", "action": "extract", "target": null}
+{"timestamp": "2026-09-12T19:44:08.820442+00:00", "event": "output_extracted", "name": "savings_balance", "value": "$2150.75"}
+{"timestamp": "2026-09-12T19:44:08.820659+00:00", "event": "step_completed", "step_id": "step_3"}
+{"timestamp": "2026-09-12T19:44:08.823856+00:00", "event": "replay_completed", "status": "success", "outputs": {"savings_balance": "$2150.75"}, "recovered_steps": []}

@@ -1,0 +1,7 @@
+{"timestamp": "2026-09-12T19:37:27.966210+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
+{"timestamp": "2026-09-12T19:37:28.010706+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
+{"timestamp": "2026-09-12T19:37:28.030259+00:00", "event": "step_completed", "step_id": "step_1"}
+{"timestamp": "2026-09-12T19:37:28.031498+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
+{"timestamp": "2026-09-12T19:37:28.033177+00:00", "event": "step_retry", "step_id": "step_2", "attempt": 1, "error": "Search target remained unavailable."}
+{"timestamp": "2026-09-12T19:37:28.535662+00:00", "event": "step_retry", "step_id": "step_2", "attempt": 2, "error": "Search target remained unavailable."}
+{"timestamp": "2026-09-12T19:37:29.083814+00:00", "event": "replay_failed", "code": "STEP_EXECUTION_FAILED", "failed_step": "step_2", "message": "Search target remained unavailable.", "evidence_path": "evidence/failure_step_2.png"}

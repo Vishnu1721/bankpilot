@@ -1,0 +1,11 @@
+{"timestamp": "2026-09-12T19:44:57.238896+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
+{"timestamp": "2026-09-12T19:44:57.283622+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
+{"timestamp": "2026-09-12T19:44:57.304619+00:00", "event": "step_completed", "step_id": "step_1"}
+{"timestamp": "2026-09-12T19:44:57.307051+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
+{"timestamp": "2026-09-12T19:44:57.414249+00:00", "event": "step_completed", "step_id": "step_2"}
+{"timestamp": "2026-09-12T19:44:57.422912+00:00", "event": "handoff_started", "reason": "LegacyBank requires manual member verification."}
+{"timestamp": "2026-09-12T19:45:06.720771+00:00", "event": "handoff_completed", "handoff_number": 1}
+{"timestamp": "2026-09-12T19:45:06.740756+00:00", "event": "step_started", "step_id": "step_3", "action": "extract", "target": null}
+{"timestamp": "2026-09-12T19:45:06.754800+00:00", "event": "output_extracted", "name": "savings_balance", "value": "$3675.20"}
+{"timestamp": "2026-09-12T19:45:06.754992+00:00", "event": "step_completed", "step_id": "step_3"}
+{"timestamp": "2026-09-12T19:45:06.758241+00:00", "event": "replay_completed", "status": "success", "outputs": {"savings_balance": "$3675.20"}, "recovered_steps": []}
