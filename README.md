@@ -251,7 +251,7 @@ Replay itself does not require an OpenAI API call.
 Clone the repository and enter the project directory.
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
+git clone https://github.com/Vishnu1721/bankpilot.git
 cd bankpilot
 ```
 
