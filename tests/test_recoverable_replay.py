@@ -3,8 +3,8 @@ from src.surface.browser import BrowserSurface
 
 
 CAPABILITY_PATH = (
-    "artifacts/"
-    "lookup_savings_balance.json"
+    "evidence/"
+    "example_capability.json"
 )
 
 
@@ -33,7 +33,7 @@ class RecoverableReplayEngine(
         target
     ):
         if (
-            target.name == "Search"
+            target.name == "Search Member"
             and not self.simulated_failure
         ):
             self.simulated_failure = True
@@ -71,6 +71,10 @@ try:
             "member_id": "10024"
         }
     )
+
+    assert result.status.value == "success", result
+    assert result.recovered_steps == ["step_3"], result
+    assert result.outputs == {"savings_balance": "$2150.75"}, result
 
     print(
         "\nRECOVERABLE REPLAY RESULT"

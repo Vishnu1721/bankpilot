@@ -8,8 +8,8 @@ from src.surface.browser import (
 
 
 CAPABILITY_PATH = (
-    "artifacts/"
-    "lookup_savings_balance.json"
+    "evidence/"
+    "example_capability.json"
 )
 
 
@@ -39,6 +39,10 @@ try:
             "member_id": "10025"
         }
     )
+
+    assert result.status.value == "success", result
+    assert engine.handoff_count == 1, "Expected exactly one human handoff."
+    assert result.outputs == {"savings_balance": "$3675.20"}, result
 
     print(
         "\nHANDOFF REPLAY RESULT"
