@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Balance Result</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header class="header"><div><span class="brand-mark">LB</span> LegacyBank Credit Union</div><a class="header-link" href="/">Operations</a></header>
+<main class="container"><div class="eyebrow">ACCOUNT INFORMATION · READ ONLY</div><h1>Balance Result</h1>
+<table class="details"><tr><td>Member Number</td><td>{{ member_id }}</td></tr><tr><td>Member Name</td><td>{{ member.name }}</td></tr><tr><td>Account Type</td><td>{{ account_type }}</td></tr><tr><td>Current Balance</td><td>${{ balance }}</td></tr></table>
+<a href="{{ url_for('balance_lookup') }}">Another balance lookup</a></main></body></html>
