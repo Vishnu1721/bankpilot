@@ -137,6 +137,14 @@ class CapabilityRecorder:
             capability_id = "lookup_savings_balance"
             display_name = "Lookup Savings Balance"
             description = "Find a member and return their current savings balance."
+            used_balance_lookup = any(
+                step.target
+                and step.target.name in {"Balance Lookup", "View Balance"}
+                for step in steps
+            )
+            extraction_label = (
+                "Current Balance" if used_balance_lookup else "Savings Balance"
+            )
             outputs = [
                 OutputDefinition(
                     name="savings_balance",
@@ -149,11 +157,14 @@ class CapabilityRecorder:
                     step_id=f"step_{len(steps) + 1}",
                     action=StepType.EXTRACT,
                     target=None,
-                    value="Savings Balance",
+                    value=extraction_label,
                     description="Extract the current savings balance.",
                 )
             )
-            success = SuccessCondition(type="text_present", value="Member Details")
+            success = SuccessCondition(
+                type="text_present",
+                value="Balance Result" if used_balance_lookup else "Member Details",
+            )
 
         parameter_definitions = [
             ParameterDefinition(
