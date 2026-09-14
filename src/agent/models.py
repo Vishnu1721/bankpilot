@@ -1,3 +1,5 @@
+import hashlib
+import json
 from enum import Enum
 from typing import Optional
 
@@ -7,6 +9,7 @@ from pydantic import BaseModel
 class ActionType(str, Enum):
     CLICK = "click"
     TYPE = "type"
+    SELECT = "select"
     READ = "read"
     WAIT = "wait"
     FINISH = "finish"
@@ -26,6 +29,21 @@ class Observation(BaseModel):
     title: str
     text: str
     elements: list[UIElement]
+    trust: str = "untrusted_ui_data"
+
+    def fingerprint(self):
+        payload = {
+            "url": self.url,
+            "title": self.title,
+            "text": self.text,
+            "elements": [
+                (element.role, element.name, element.value)
+                for element in self.elements
+            ],
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True).encode("utf-8")
+        ).hexdigest()
 
 
 class AgentAction(BaseModel):
