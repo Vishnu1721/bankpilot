@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from flask import Flask, redirect, render_template, request, url_for
 
 app = Flask(__name__)
@@ -116,15 +118,15 @@ def review_deposit():
     memo = request.form.get("memo", "").strip()
 
     try:
-        amount = float(amount_text)
-    except ValueError:
-        amount = 0
+        amount = Decimal(amount_text)
+    except InvalidOperation:
+        amount = Decimal("0")
 
     if member is None:
         return render_template("deposit_form.html", error="Member not found.")
     if account_type not in {"Checking", "Savings"}:
         return render_template("deposit_form.html", error="Choose a valid destination account.")
-    if amount <= 0 or amount > 10000:
+    if not amount.is_finite() or amount <= 0 or amount > Decimal("10000"):
         return render_template("deposit_form.html", error="Deposit must be between $0.01 and $10,000.")
 
     return render_template(
