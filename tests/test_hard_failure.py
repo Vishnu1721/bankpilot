@@ -3,8 +3,8 @@ from src.surface.browser import BrowserSurface
 
 
 CAPABILITY_PATH = (
-    "artifacts/"
-    "lookup_savings_balance.json"
+    "evidence/"
+    "example_capability.json"
 )
 
 
@@ -16,7 +16,7 @@ class HardFailureReplayEngine(
         self,
         target
     ):
-        if target.name == "Search":
+        if target.name == "Search Member":
             raise RuntimeError(
                 "Search target remained "
                 "unavailable."
@@ -56,6 +56,10 @@ try:
             "member_id": "10024"
         }
     )
+
+    assert result.status.value == "failure", result
+    assert result.code == "STEP_EXECUTION_FAILED", result
+    assert result.failed_step == "step_3", result
 
     print(
         "\nHARD FAILURE RESULT"

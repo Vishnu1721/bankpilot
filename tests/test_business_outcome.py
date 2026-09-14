@@ -3,8 +3,8 @@ from src.surface.browser import BrowserSurface
 
 
 CAPABILITY_PATH = (
-    "artifacts/"
-    "lookup_savings_balance.json"
+    "evidence/"
+    "example_capability.json"
 )
 
 
@@ -35,6 +35,9 @@ try:
             "member_id": "99999"
         }
     )
+
+    assert result.status.value == "business_outcome", result
+    assert result.code == "MEMBER_NOT_FOUND", result
 
     print(
         "\nBUSINESS OUTCOME RESULT"
