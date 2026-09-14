@@ -1,4 +1,5 @@
 from src.agent.budget import DiscoveryBudget, DiscoveryBudgetExceeded
+from src.agent.llm import LLMClient
 from src.agent.models import ActionType, AgentAction, Observation, UIElement
 from src.safety.observation import UntrustedObservationGuard
 from src.safety.policy import SafetyPolicy, SafetyViolation
@@ -58,6 +59,17 @@ def test_llm_call_budget_is_bounded():
         pass
 
 
+
+def test_first_json_action_is_used_when_model_appends_data():
+    raw = (
+        '{"action":"click","element_id":"e1","value":null,'
+        '"reasoning":"Open workflow.","result":null}'
+        '{"unexpected":"second object"}'
+    )
+    parsed = LLMClient._parse_first_json_object(raw)
+    assert parsed["action"] == "click"
+    assert parsed["element_id"] == "e1"
+
 def test_final_account_commit_is_blocked():
     policy = SafetyPolicy()
     current = Observation(
@@ -90,5 +102,6 @@ if __name__ == "__main__":
     test_observation_is_marked_untrusted()
     test_repeated_state_budget_is_bounded()
     test_llm_call_budget_is_bounded()
+    test_first_json_action_is_used_when_model_appends_data()
     test_final_account_commit_is_blocked()
-    print("5/5 security boundary tests passed")
+    print("6/6 security boundary tests passed")
