@@ -38,6 +38,7 @@ class SafetyPolicy:
             "approve payment",
             "confirm payment",
             "confirm & open",
+            "post deposit",
             "open account now",
         }
 
