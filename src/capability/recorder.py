@@ -1,5 +1,4 @@
 import json
-import re
 from pathlib import Path
 
 from src.agent.models import ActionType
@@ -59,27 +58,51 @@ class CapabilityRecorder:
         )
 
     def build_capability(self, start_url, goal="", result=None):
-        is_subaccount = "sub-account" in goal.lower() or "sub account" in goal.lower()
+        goal_text = goal.lower()
         steps = list(self.recorded_steps)
 
-        if is_subaccount:
-            capability_id = "prepare_new_subaccount"
-            name = "Prepare New Sub-account"
-            description = "Prepare a new sub-account and stop at confirmation review."
+        if "deposit" in goal_text:
+            capability_id = "prepare_deposit"
+            display_name = "Prepare Deposit"
+            description = "Prepare a deposit and stop before funds are posted."
             outputs = [
                 OutputDefinition(
-                    name="confirmation_status",
+                    name="review_status",
                     type="string",
-                    description="Review status without committing the account.",
+                    description="Deposit review reached without posting funds.",
                 )
             ]
-            success = SuccessCondition(
-                type="text_present",
-                value="Review New Sub-account",
-            )
+            success = SuccessCondition(type="text_present", value="Deposit Review")
+
+        elif "sub-account" in goal_text or "sub account" in goal_text:
+            capability_id = "prepare_new_subaccount"
+            display_name = "Prepare New Sub-account"
+            description = "Prepare a new sub-account and stop before account creation."
+            outputs = [
+                OutputDefinition(
+                    name="review_status",
+                    type="string",
+                    description="Sub-account confirmation review reached.",
+                )
+            ]
+            success = SuccessCondition(type="text_present", value="Review New Sub-account")
+
+        elif "member lookup" in goal_text or "member profile" in goal_text:
+            capability_id = "lookup_member"
+            display_name = "Lookup Member"
+            description = "Find a member and display their account profile."
+            outputs = [
+                OutputDefinition(
+                    name="member_status",
+                    type="string",
+                    description="Member profile lookup result.",
+                )
+            ]
+            success = SuccessCondition(type="text_present", value="Member Details")
+
         else:
             capability_id = "lookup_savings_balance"
-            name = "Lookup Savings Balance"
+            display_name = "Lookup Savings Balance"
             description = "Find a member and return their current savings balance."
             outputs = [
                 OutputDefinition(
@@ -101,20 +124,20 @@ class CapabilityRecorder:
 
         parameter_definitions = [
             ParameterDefinition(
-                name=name,
+                name=parameter_name,
                 type="string",
                 required=True,
-                description=f"Runtime value for {name.replace('_', ' ')}.",
+                description=f"Runtime value for {parameter_name.replace('_', ' ')}.",
             )
-            for name in self.parameters
+            for parameter_name in self.parameters
         ]
 
         return Capability(
             schema_version="1.1",
             capability_id=capability_id,
-            name=name,
+            name=display_name,
             description=description,
-            application="LegacyBank",
+            application="LegacyBank Credit Union",
             start_url=start_url,
             parameters=parameter_definitions,
             outputs=outputs,
