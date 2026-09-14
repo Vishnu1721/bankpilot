@@ -39,5 +39,10 @@ try:
     print(result)
     surface.screenshot("evidence/subaccount_review.png")
     input("\nPress Enter to close...")
+except Exception as error:
+    print(f"\nDISCOVERY FAILED: {error}")
+    surface.screenshot("evidence/live_discovery_failure.png")
+    input("\nBrowser left open for inspection. Press Enter to close...")
+    raise
 finally:
     surface.close()
