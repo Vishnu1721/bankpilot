@@ -87,6 +87,28 @@ class CapabilityRecorder:
             ]
             success = SuccessCondition(type="text_present", value="Review New Sub-account")
 
+        elif "balance lookup" in goal_text:
+            capability_id = "lookup_balance"
+            display_name = "Lookup Balance"
+            description = "Retrieve a selected account balance."
+            outputs = [
+                OutputDefinition(
+                    name="current_balance",
+                    type="string",
+                    description="Current balance for the selected account.",
+                )
+            ]
+            steps.append(
+                CapabilityStep(
+                    step_id=f"step_{len(steps) + 1}",
+                    action=StepType.EXTRACT,
+                    target=None,
+                    value="Current Balance",
+                    description="Extract the selected account balance.",
+                )
+            )
+            success = SuccessCondition(type="text_present", value="Balance Result")
+
         elif "member lookup" in goal_text or "member profile" in goal_text:
             capability_id = "lookup_member"
             display_name = "Lookup Member"
