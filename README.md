@@ -1,764 +1,106 @@
 # BankPilot
 
-BankPilot is a prototype computer-use automation system that discovers workflows in browser-based business applications and converts successful executions into reusable capability artifacts.
+BankPilot is a computer-use automation prototype in which an LLM discovers a browser workflow once, records it as a typed JSON capability, and replays that capability deterministically. The included LegacyBank Credit Union portal is mock software: it never opens an account or posts funds.
 
-During **discovery**, an LLM operates a live application through a constrained observe → decide → act loop. After a successful run, BankPilot records the workflow as a structured, typed, versioned JSON capability.
+## Setup
 
-During **replay**, BankPilot executes that saved capability deterministically with new parameters. The LLM is not used in the replay decision loop.
-
-The project also demonstrates safety guardrails, structured error handling, bounded recovery, human-in-the-loop escalation, same-session resume, and execution evidence.
-
----
-
-## Architecture
-
-```text
-Natural-Language Goal
-        |
-        v
-+---------------------+
-|   Discovery Agent   |
-|       (LLM)         |
-+----------+----------+
-           |
-           | constrained actions
-           v
-+---------------------+
-|   Surface Adapter   |
-|     Playwright      |
-+----------+----------+
-           |
-           v
-+---------------------+
-|     LegacyBank      |
-|      Mock UI        |
-+----------+----------+
-           |
-           | successful workflow
-           v
-+---------------------+
-| Capability Recorder |
-+----------+----------+
-           |
-           v
-+-----------------------------+
-| Versioned Capability JSON   |
-| parameters / targets /      |
-| actions / outputs / success |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Deterministic Replay Engine |
-|         NO LLM              |
-+-------------+---------------+
-              |
-              v
-   SUCCESS / BUSINESS OUTCOME
-   / RECOVERY / FAILURE
-```
-
-Cross-cutting components include:
-
-- safety policy
-- domain and action allowlists
-- risky-action blocking
-- structured event logging
-- screenshots on failures
-- human handoff
-- same-browser-session resume
-
----
-
-## Demonstrated Workflow
-
-The included LegacyBank application simulates a legacy banking administration interface.
-
-The primary goal is:
-
-```text
-Look up a member and return their current savings balance.
-```
-
-During discovery, BankPilot can execute a request such as:
-
-```text
-Look up member 10023 and return their current savings balance.
-```
-
-The LLM discovers the workflow:
-
-```text
-TYPE member number
-CLICK Search
-EXTRACT Savings Balance
-```
-
-The resulting artifact does not persist the discovery value as a hardcoded workflow value.
-
-Instead it records:
-
-```json
-"value": "{{member_id}}"
-```
-
-The same capability can therefore be replayed with another input such as `10024`.
-
----
-
-## Discovery vs Replay
-
-### Discovery
-
-Discovery uses an LLM to determine the next action from the current UI observation.
-
-The model is restricted to a small action vocabulary:
-
-```text
-click
-type
-read
-wait
-finish
-escalate
-```
-
-The model does not receive unrestricted Python, JavaScript, shell, or Playwright execution access.
-
-The discovery loop is:
-
-```text
-observe
-   ↓
-LLM decides one action
-   ↓
-safety validation
-   ↓
-execute
-   ↓
-observe again
-```
-
-A successful workflow is converted into a capability artifact.
-
-### Replay
-
-Replay loads the saved capability and executes its steps directly.
-
-```text
-Capability JSON
-      ↓
-Validate parameters
-      ↓
-Resolve {{member_id}}
-      ↓
-Locate recorded target
-      ↓
-Execute recorded action
-      ↓
-Extract output
-      ↓
-Validate success condition
-```
-
-There is **no LLM call in the replay decision loop**.
-
----
-
-## Capability Artifact
-
-An example generated artifact is available at:
-
-```text
-evidence/example_capability.json
-```
-
-The artifact contains:
-
-- schema version
-- capability identifier
-- application and start URL
-- typed input parameters
-- typed outputs
-- ordered actions
-- semantic target information
-- selector fallback information
-- parameter placeholders
-- extraction instructions
-- success condition
-
-Example:
-
-```json
-{
-  "step_id": "step_1",
-  "action": "type",
-  "target": {
-    "role": "textbox",
-    "name": "Member Id",
-    "selector": "input[name=\"member_id\"]"
-  },
-  "value": "{{member_id}}",
-  "description": "Enter value into Member Id."
-}
-```
-
-The capability is intentionally decoupled from the raw LLM transcript.
-
----
-
-## Project Structure
-
-```text
-bankpilot/
-├── artifacts/
-├── demo_app/
-│   ├── app.py
-│   ├── static/
-│   └── templates/
-├── evidence/
-├── src/
-│   ├── agent/
-│   ├── capability/
-│   ├── handoff/
-│   ├── observability/
-│   ├── safety/
-│   └── surface/
-├── tests/
-├── .env.example
-├── .gitignore
-├── main.py
-├── README.md
-├── REPORT.md
-└── requirements.txt
-```
-
----
-
-## Requirements
-
-- Python 3.11+
-- Chromium installed through Playwright
-- OpenAI API key for discovery
-- macOS/Linux/Windows environment capable of running Playwright
-
-Replay itself does not require an OpenAI API call.
-
----
-
-## Installation
-
-Clone the repository and enter the project directory.
+Requires Python 3.11+ and an OpenAI API key for discovery.
 
 ```bash
-git clone https://github.com/Vishnu1721/bankpilot.git
-cd bankpilot
-```
-
-Create a virtual environment:
-
-```bash
-python3 -m venv .venv
-```
-
-Activate it.
-
-macOS/Linux:
-
-```bash
+python -m venv .venv
 source .venv/bin/activate
-```
-
-Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
-```
-
-Install the Playwright Chromium browser:
-
-```bash
 playwright install chromium
-```
-
-Create your local environment file:
-
-```bash
 cp .env.example .env
 ```
 
-Then add your OpenAI API key to `.env`:
+Set `OPENAI_API_KEY` in `.env`. Deterministic replay and unit checks do not call the model.
 
-```text
-OPENAI_API_KEY=your_key_here
-```
+## Start the mock portal
 
-The `.env` file is excluded from Git and must never be committed.
-
----
-
-## Start LegacyBank
-
-BankPilot includes a local mock application so that computer-use behavior can be demonstrated safely and reproducibly.
-
-In Terminal 1:
+In terminal 1:
 
 ```bash
 source .venv/bin/activate
 python demo_app/app.py
 ```
 
-LegacyBank runs at:
+Keep it running at `http://127.0.0.1:5001`.
 
-```text
-http://127.0.0.1:5001
-```
+## Canonical discovery-to-replay path
 
-Keep this terminal running.
-
----
-
-## Run LLM Discovery
-
-In Terminal 2:
+In terminal 2, this one command performs the assignment's complete thread:
 
 ```bash
 source .venv/bin/activate
-python -m tests.test_discovery
+python -m tests.test_end_to_end
 ```
 
-A Chromium browser opens.
-
-BankPilot uses the LLM-driven observe → decide → act loop to complete the workflow.
-
-A successful run generates:
+It discovers the savings-balance workflow using member `10023`, writes the resulting schema-1.1 artifact to `artifacts/lookup_savings_balance.json`, closes the discovery browser, opens a fresh browser, loads that exact file, and replays it with input `member_id=10024`. Expected output:
 
 ```text
-artifacts/lookup_savings_balance.json
+END-TO-END PASS
+Artifact: artifacts/lookup_savings_balance.json
+Replay outputs: {'savings_balance': '$2150.75'}
 ```
 
-and discovery evidence under:
-
-```text
-evidence/
-```
-
-Discovery requires a configured OpenAI API key.
-
----
-
-## Run Deterministic Replay
-
-Run:
+The equivalent two-command path uses the same generated artifact:
 
 ```bash
+python -m tests.test_discovery
 python -m tests.test_replay
 ```
 
-The saved capability is replayed using a different member parameter.
+Both interactive scripts pause before closing so you can inspect the UI; press Enter to continue. Discovery creates `artifacts/lookup_savings_balance.json`; replay reads that file with member `10024` and writes `evidence/replay_success.jsonl` plus `evidence/replay_final.png`.
 
-Expected output includes:
+## Independent operations
 
-```text
-Extracted: $2150.75
-
-REPLAY COMPLETED
-```
-
-and a structured result similar to:
-
-```json
-{
-  "status": "success",
-  "outputs": {
-    "savings_balance": "$2150.75"
-  }
-}
-```
-
-No LLM is used to decide replay actions.
-
----
-
-## Business Outcomes
-
-BankPilot distinguishes an expected business outcome from an automation failure.
-
-Run:
+With the portal running, each operation can be discovered separately:
 
 ```bash
-python -m tests.test_business_outcome
-```
-
-The demo searches for an unknown member.
-
-Expected result:
-
-```json
-{
-  "status": "business_outcome",
-  "code": "MEMBER_NOT_FOUND",
-  "message": "Member not found"
-}
-```
-
-This is not classified as an automation failure because the application behaved correctly and returned a valid business outcome.
-
----
-
-## Recoverable Conditions
-
-Run:
-
-```bash
-python -m tests.test_recoverable_replay
-```
-
-The test introduces a controlled temporary UI failure.
-
-BankPilot performs bounded deterministic retries:
-
-```text
-Recoverable condition at step_2
-Retrying...
-Recovered after 1 retry
-```
-
-The workflow then completes successfully.
-
-The final result records:
-
-```json
-"recovered_steps": [
-  "step_2"
-]
-```
-
----
-
-## Hard Failures
-
-Run:
-
-```bash
-python -m tests.test_hard_failure
-```
-
-This test simulates a target that remains unavailable.
-
-BankPilot retries within its configured limit and then produces a structured hard failure.
-
-Example:
-
-```json
-{
-  "status": "failure",
-  "code": "STEP_EXECUTION_FAILED",
-  "failed_step": "step_2",
-  "expected": "Action 'click' on target 'Search'.",
-  "evidence_path": "evidence/failure_step_2.png"
-}
-```
-
-The result includes:
-
-- failed step
-- expected behavior
-- observed page state
-- error information
-- screenshot evidence
-
----
-
-## Human-in-the-Loop Handoff
-
-Run:
-
-```bash
-python -m tests.test_handoff
-```
-
-Member `10025` requires manual verification.
-
-BankPilot:
-
-```text
-automation executes
-        ↓
-manual verification detected
-        ↓
-automation pauses
-        ↓
-browser remains open
-        ↓
-human completes verification
-        ↓
-human presses Enter
-        ↓
-automation resumes
-        ↓
-output extracted
-```
-
-The intervention occurs in the **same live browser session**.
-
-Expected final output:
-
-```text
-Extracted: $3675.20
-
-Human handoffs: 1
-```
-
----
-
-## Multi-operation Credit Union Portal
-
-The home page is now an employee operations dashboard with independent entry
-points. An agent does not need to perform member lookup before every task.
-
-| Operation | Goal boundary | Artifact |
-| --- | --- | --- |
-| Member Lookup | Member details displayed | `lookup_member.json` |
-| Balance Lookup | Requested balance displayed | `lookup_savings_balance.json` |
-| Create Sub-account | Confirmation review only | `prepare_new_subaccount.json` |
-| Deposit | Deposit review only | `prepare_deposit.json` |
-
-The deposit and sub-account commit endpoints always return HTTP 403. They exist
-only to prove that a second server-side boundary protects the mock application.
-
-Run deterministic portal checks:
-
-```bash
-python -m tests.test_mock_subaccount
-```
-
-Run independent LLM discovery demonstrations after starting the demo app:
-
-```bash
+python -m tests.test_member_discovery
+python -m tests.test_balance_discovery
 python -m tests.test_subaccount_discovery
 python -m tests.test_deposit_discovery
 ```
 
-## Safe Sub-account Review Workflow
+Expected boundaries:
 
-The expanded credit-union mock supports a second goal:
+| Operation | Output | Final state |
+| --- | --- | --- |
+| Member lookup | `member_name` | Member Details |
+| Balance lookup | `current_balance` | Balance Result |
+| New sub-account | reviewed `account_type` | Review New Sub-account; not opened |
+| Deposit | reviewed `amount` | Deposit Review; not posted |
 
-```text
-Look up member 10023, prepare a Holiday Savings sub-account named
-Vacation, and reach the confirmation review screen. Do not confirm.
-```
+Representative sanitized schema-1.1 artifacts are committed in `artifacts/`. The sub-account and deposit JSONL files in `evidence/` are sanitized from verified live mock-portal runs; new runs replace/extend runtime evidence locally.
 
-Run the mock application, then:
+## Verification
 
-```bash
-python -m tests.test_subaccount_discovery
-```
-
-Discovery records member lookup, account-type selection, nickname entry, and
-navigation to **Review New Sub-account**. It must finish there. The final
-**Confirm & Open** click is policy-blocked, and the mock commit endpoint returns
-HTTP 403, so this demo never creates an account or changes financial data.
-
-## Untrusted UI Defense
-
-Browser text, element names, labels, errors, and values are tagged as
-`untrusted_ui_data`. Only rendered text and visible controls are observed.
-Before an observation reaches the model, BankPilot:
-
-- normalizes control characters and whitespace
-- caps body, field, and element counts
-- detects common instruction/prompt-injection patterns
-- stops for human review when UI text tries to direct the agent
-- places policy in a system message and UI data in a clearly marked data envelope
-
-This is defense in depth rather than a claim that keyword detection alone solves
-prompt injection. The decisive boundary remains deterministic action validation,
-element binding, domain restriction, budgets, and human approval for consequential
-actions.
-
-## Explicit Discovery Budgets
-
-`DiscoveryBudget` applies independent hard limits for:
-
-- total steps
-- LLM calls
-- elapsed wall-clock time
-- observation characters
-- repeated identical states (no-progress loop)
-
-Budget configuration and consumption are logged. Exceeding any limit stops
-discovery with `DiscoveryBudgetExceeded`.
-
-Run the deterministic boundary tests without an API key:
+Run checks that do not require an API key:
 
 ```bash
 python -m tests.test_security_boundaries
 python -m tests.test_mock_subaccount
+python -m tests.test_capability_outputs
 ```
 
-## Multi-surface Direction
-
-The shared `Surface` protocol decouples discovery from Playwright.
-`BrowserSurface` is fully operational. `TerminalSurface` provides a restricted,
-no-shell executable allowlist and deliberately refuses arbitrary LLM commands.
-`DesktopSurface` is an explicit accessibility-tree extension point; platform
-accessibility providers and foreground-application checks must be implemented
-before it can execute desktop actions. Pixel-coordinate clicking is intentionally
-not part of the contract.
-
-## Safety
-
-BankPilot applies safety checks before browser actions and replay operations.
-
-The current prototype includes:
-
-- domain allowlisting
-- constrained action vocabulary
-- replay action validation
-- risky-action detection
-- secret-aware logging
-- parameterized capability values
-
-For example, navigation to an unapproved domain is blocked.
-
-A risky action such as:
-
-```text
-Delete Account
-```
-
-is also blocked by the current policy.
-
-The prototype's risky-action classifier is intentionally conservative and keyword-based. A production implementation should replace this with structured action risk metadata and policy evaluation.
-
----
-
-## Observability
-
-BankPilot emits structured JSONL execution events.
-
-Evidence includes logs for:
-
-```text
-discovery
-successful replay
-recovered replay
-business outcome
-hard failure
-human handoff
-```
-
-Example events include:
-
-```text
-replay_started
-step_started
-step_completed
-step_retry
-step_recovered
-output_extracted
-handoff_started
-handoff_completed
-replay_completed
-replay_failed
-```
-
-Failure paths also capture screenshots.
-
----
-
-## Evidence
-
-The `/evidence` directory contains representative artifacts from the demonstrated workflows, including:
-
-```text
-example_capability.json
-discovery_log.jsonl
-replay_success.jsonl
-replay_recovered.jsonl
-replay_business_outcome.jsonl
-replay_failure.jsonl
-handoff_log.jsonl
-discovery_final.png
-replay_final.png
-business_outcome.png
-failure_step_2.png
-handoff_final.png
-```
-
-The evidence demonstrates both successful and exceptional execution paths.
-
----
-
-## Validation
-
-Core architecture and policy checks can be run without an OpenAI API call:
+Then verify deterministic success and exceptional paths while the portal is running:
 
 ```bash
-python -m tests.test_validation
+python -m tests.test_replay
+python -m tests.test_business_outcome
+python -m tests.test_recoverable_replay
+python -m tests.test_hard_failure
+python -m tests.test_handoff
 ```
 
-The validation suite covers:
+The handoff demo uses member `10025`. It records capability, current step, URL, reason, screenshot, control owner, and the human action before resuming in the same browser session.
 
-- generic parameterization
-- capability schema validation
-- domain allowlisting
-- blocked domains
-- safe actions
-- risky-action blocking
-- replay parameter resolution
+## Safety boundaries
 
-Parameterization can also be checked independently:
+UI text is tagged and sanitized as untrusted model input. Discovery has explicit step, model-call, time, observation-size, and repeated-state budgets. Proposed actions are validated against the current observation and approved local domains. Stable selectors prefer test IDs, accessible labels, names, IDs, and hrefs. Consequential buttons are policy-blocked, and the mock commit routes also return `403`.
 
-```bash
-python -m tests.test_parameterization
-```
+`BrowserSurface` is operational. `TerminalSurface` permits only configured executables with no shell. `DesktopSurface` is an accessibility-tree extension point and is not enabled until platform-specific controls exist.
 
----
-
-## Security Notes
-
-Do not commit:
-
-```text
-.env
-API keys
-credentials
-session secrets
-raw sensitive customer data
-```
-
-Runtime secrets are loaded from environment variables.
-
-The checked-in capability example uses parameter placeholders such as:
-
-```text
-{{member_id}}
-```
-
-rather than persisting the discovery member value as a workflow constant.
-
----
-
-## Design Scope
-
-BankPilot is intentionally a focused prototype.
-
-The implementation prioritizes:
-
-1. real LLM-driven discovery against a live UI
-2. a reusable capability representation
-3. deterministic no-LLM replay
-4. structured error handling
-5. human escalation and same-session resume
-6. safety boundaries
-7. observable execution
-
-Production extensions and deliberate cuts are discussed in `REPORT.md`.
+See `REPORT.md` for the required architecture, schema, determinism, multi-tenant, handoff, safety, and cuts discussion.

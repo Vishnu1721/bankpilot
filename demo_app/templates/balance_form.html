@@ -7,6 +7,6 @@
 <label for="member_id">Member Number</label><input id="member_id" name="member_id" required>
 <label for="account_type">Account Type</label>
 <select id="account_type" name="account_type" required><option value="">Choose account</option><option>Checking</option><option>Savings</option></select>
-<button type="submit">View Balance</button></form>
+<button type="submit" aria-label="View Balance">View Balance</button></form>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 </main></body></html>

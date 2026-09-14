@@ -7,6 +7,6 @@
 <form action="{{ url_for('find_member') }}" method="post">
 <label for="member_id">Member Number</label>
 <input id="member_id" type="text" name="member_id" autocomplete="off" required>
-<button type="submit">Search Member</button></form>
+<button type="submit" aria-label="Search Member">Search Member</button></form>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 </main></body></html>

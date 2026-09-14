@@ -89,6 +89,7 @@ class DiscoveryAgent:
                     step=step_number,
                     action=action.action.value,
                     element_id=action.element_id,
+                    reasoning=action.reasoning,
                 )
                 self.safety.check_action(action, observation)
 

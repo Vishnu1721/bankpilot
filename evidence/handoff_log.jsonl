@@ -3,8 +3,8 @@
 {"timestamp": "2026-09-12T19:44:57.304619+00:00", "event": "step_completed", "step_id": "step_1"}
 {"timestamp": "2026-09-12T19:44:57.307051+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
 {"timestamp": "2026-09-12T19:44:57.414249+00:00", "event": "step_completed", "step_id": "step_2"}
-{"timestamp": "2026-09-12T19:44:57.422912+00:00", "event": "handoff_started", "reason": "LegacyBank requires manual member verification."}
-{"timestamp": "2026-09-12T19:45:06.720771+00:00", "event": "handoff_completed", "handoff_number": 1}
+{"timestamp": "2026-09-12T19:44:57.422912+00:00", "event": "handoff_started", "control_owner": "human", "capability_id": "lookup_savings_balance", "step_id": "step_2", "url": "http://127.0.0.1:5001/member", "page_title": "Manual Verification Required", "reason": "LegacyBank requires manual member verification.", "screenshot": "evidence/handoff_final.png"}
+{"timestamp": "2026-09-12T19:45:06.720771+00:00", "event": "handoff_completed", "handoff_number": 1, "control_owner": "automation", "capability_id": "lookup_savings_balance", "step_id": "step_2", "url": "http://127.0.0.1:5001/member", "human_action": "Completed member verification in the preserved browser session.", "screenshot": "evidence/handoff_final.png"}
 {"timestamp": "2026-09-12T19:45:06.740756+00:00", "event": "step_started", "step_id": "step_3", "action": "extract", "target": null}
 {"timestamp": "2026-09-12T19:45:06.754800+00:00", "event": "output_extracted", "name": "savings_balance", "value": "$3675.20"}
 {"timestamp": "2026-09-12T19:45:06.754992+00:00", "event": "step_completed", "step_id": "step_3"}
