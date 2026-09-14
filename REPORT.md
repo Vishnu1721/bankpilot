@@ -1,154 +1,73 @@
 # BankPilot Design Report
 
-## 1. Architecture
+## 1. Executive summary
 
-BankPilot separates workflow discovery from workflow execution. The central design decision is that an LLM is useful for discovering how to operate an unfamiliar interface, but repeated execution should not depend on the LLM making the same decisions again.
+BankPilot demonstrates a two-phase approach to computer-use automation:
 
-The system therefore has two primary execution modes:
+1. an LLM discovers how to complete a workflow through a constrained UI interface; and
+2. the successful workflow becomes a typed capability that can be replayed deterministically without an LLM deciding subsequent actions.
 
-```text
-                     DISCOVERY
-Natural-Language Goal
-        |
-        v
-+-------------------+
-| Discovery Agent   |
-|       LLM         |
-+---------+---------+
-          |
-          | observe / decide / act
-          v
-+-------------------+
-| Surface Adapter   |
-|    Playwright     |
-+---------+---------+
-          |
-          v
-+-------------------+
-| LegacyBank UI     |
-+---------+---------+
-          |
-          | successful execution
-          v
-+-------------------+
-| Capability        |
-| Recorder          |
-+---------+---------+
-          |
-          v
-   Capability JSON
+The current prototype operates a local LegacyBank Credit Union employee portal. It supports independent Member Lookup, Balance Lookup, Create Sub-account, and Deposit workflows. Read-only workflows may finish when the requested information is visible. Consequential workflows stop at a review screen and require human approval; the mock application never creates an account or posts funds.
 
+## 2. Architecture
 
-                       REPLAY
-   Capability JSON
-          |
-          v
-+-------------------+
-| Replay Engine     |
-|     NO LLM        |
-+---------+---------+
-          |
-          v
-+-------------------+
-| Surface Adapter   |
-|    Playwright     |
-+---------+---------+
-          |
-          v
-+-------------------+
-| LegacyBank UI     |
-+---------+---------+
-          |
-          v
-      Typed Result
-```
+### Discovery
 
-### Discovery Agent
+~~~text
+Trusted user goal
+      |
+      v
+Observe visible UI -> sanitize/tag untrusted data -> LLM proposes one action
+      |                                             |
+      +---------------- policy validation <---------+
+                            |
+                            v
+                    Surface executes action
+                            |
+                            v
+                  Record successful workflow
+~~~
 
-The discovery agent receives a natural-language goal and repeatedly observes the live UI, asks the LLM for exactly one next action, validates that action against the safety policy, and executes it through the surface adapter.
+The LLM may propose `click`, `type`, `select`, `read`, `wait`, `finish`, or `escalate`. It cannot return executable Python, JavaScript, shell commands, or Playwright selectors. The proposed element ID must exist in the current observation before application code executes it.
 
-The LLM is restricted to:
+### Capability recording
 
-```text
-click
-type
-read
-wait
-finish
-escalate
-```
+The recorder converts successful discovery into schema-versioned JSON. It stores ordered actions and stable targets rather than the raw model transcript. Runtime values are parameterized:
 
-It does not receive arbitrary Python, JavaScript, shell, or unrestricted Playwright execution.
+~~~text
+discovery value: 10024
+artifact value:  {{member_id}}
+~~~
 
-This keeps the model in a planning role while deterministic application code retains control over actual execution.
+This prevents a discovered member identifier, account type, amount, or memo from becoming an unintended constant in future runs.
 
-### Surface Adapter
+### Replay
 
-`BrowserSurface` encapsulates browser-specific interaction through Playwright.
+~~~text
+Capability JSON -> schema validation -> input resolution -> ordered execution
+       -> output extraction -> success-condition validation -> typed result
+~~~
 
-It exposes a small interface for:
+Replay does not ask the LLM what to do next. The artifact is the execution contract. This improves repeatability, latency, cost, reviewability, and safety.
 
-- navigation
-- UI observation
-- typing
-- clicking
-- screenshots
+## 3. Multi-operation portal
 
-During observation, interactive elements are normalized into application-independent objects containing an element ID, semantic role, accessible/display name, selector, and current value.
+The original prototype began with one member-search workflow. The expanded portal uses an operations dashboard so each business request begins independently.
 
-This gives the discovery agent a simplified representation rather than exposing the entire browser automation API.
+| Capability | Inputs | Completion condition | Risk boundary |
+| --- | --- | --- | --- |
+| `lookup_member` | `member_id` | Member Details visible | Read only |
+| `lookup_balance` | `member_id`, `account_type` | Balance Result visible | Read only |
+| `prepare_new_subaccount` | `member_id`, `account_type`, `nickname` | Review New Sub-account visible | Stop before creation |
+| `prepare_deposit` | `member_id`, `account_type`, `amount`, `memo` | Deposit Review visible | Stop before posting |
 
-### Capability Recorder
+This separation prevents one large, ambiguous capability from accumulating unrelated permissions. It also makes artifacts easier to review, version, test, and authorize independently.
 
-A successful discovery is converted into a structured capability.
+## 4. Artifact schema
 
-The recorder deliberately does not persist the raw LLM transcript. Model reasoning is useful during discovery but is not a stable execution contract.
+The current Pydantic-validated schema version is `1.1`. A capability contains:
 
-Instead, the recorder produces deterministic descriptions and parameterizes runtime values.
-
-For example, discovery may type:
-
-```text
-10023
-```
-
-but the capability stores:
-
-```text
-{{member_id}}
-```
-
-### Replay Engine
-
-Replay loads and validates the capability artifact, resolves runtime parameters, executes recorded actions, extracts outputs, and verifies the success condition.
-
-The replay engine does not import or call the LLM client. The next action comes entirely from the ordered capability steps.
-
-This separation provides the key invariant of the design:
-
-> LLM reasoning is used to discover a capability, but the capability—not the model transcript—is the execution contract for future runs.
-
-### Cross-Cutting Components
-
-Safety, observability, recovery, and human handoff are separated from the discovery logic where possible.
-
-This allows the same policy and execution concepts to evolve independently of a particular model or application.
-
----
-
-## 2. Artifact schema
-
-The capability artifact is a versioned JSON document validated using Pydantic models.
-
-A representative artifact is available at:
-
-```text
-evidence/example_capability.json
-```
-
-The top-level structure contains:
-
-```text
+~~~text
 schema_version
 capability_id
 name
@@ -159,730 +78,184 @@ parameters
 outputs
 steps
 success_condition
-```
+~~~
 
-### Versioning
+Step types include `type`, `select`, `click`, `wait`, and `extract`. Interactive targets carry semantic role/name information plus a selector fallback. Replay attempts semantic targeting and then the recorded selector.
 
-`schema_version` identifies the capability schema contract.
+The success condition is evaluated after recorded actions finish. Browser calls completing without an exception is insufficient: the expected final application state must be visible.
 
-The current prototype uses:
+## 5. Untrusted UI threat model
 
-```json
-"schema_version": "1.0"
-```
+UI text is not trusted merely because it appears inside an allowlisted application. A label, error, notification, hidden element, or compromised data record could contain instructions aimed at the model.
 
-Future schema changes can therefore be validated or migrated before replay.
+BankPilot treats page text, titles, labels, element names, and values as `untrusted_ui_data`. The observation guard:
 
-### Typed Parameters
+- uses rendered body text and visible controls;
+- removes control characters and normalizes whitespace;
+- caps text length, field length, and element count;
+- detects common instructions to ignore policy, change role, reveal secrets, or execute code; and
+- escalates when instruction-like UI content is detected.
 
-Inputs are explicitly declared rather than inferred from the discovery transcript.
+Trusted policy is placed in the system message. The user goal and UI observation are serialized separately, and the UI envelope explicitly states that its contents are data rather than instructions.
 
-Example:
+Pattern detection is not presented as a complete prompt-injection solution. The authoritative controls are outside the model: action allowlists, current-observation element binding, approved domains, discovery budgets, risk policy, and human approval.
 
-```json
-{
-  "name": "member_id",
-  "type": "string",
-  "required": true,
-  "description": "Member number to search for."
-}
-```
+## 6. Bounded discovery
 
-The runtime discovery value is converted into a placeholder:
+Restricting the action vocabulary does not by itself prevent an infinite or costly discovery loop. `DiscoveryBudget` therefore enforces separate limits on:
 
-```json
-"value": "{{member_id}}"
-```
+| Limit | Purpose |
+| --- | --- |
+| `max_steps` | Bounds total observe/act iterations |
+| `max_llm_calls` | Bounds model usage and cost |
+| `max_elapsed_seconds` | Bounds wall-clock execution |
+| `max_observation_chars` | Bounds UI data sent for reasoning |
+| `max_same_state` | Detects repeated no-progress states |
 
-During replay, the placeholder is resolved from the new input dictionary.
+Configuration and consumption are logged. Crossing a limit raises `DiscoveryBudgetExceeded` and terminates the run explicitly.
 
-This allows one discovered capability to be reused with different member identifiers.
+## 7. Browser targeting and model-output robustness
 
-### Typed Outputs
+The browser adapter normalizes visible controls into element ID, role, name, selector, and value. Stable selector priority is:
 
-The capability also declares its expected output:
+~~~text
+data-testid -> aria-label -> name -> id -> href -> structural XPath
+~~~
 
-```json
-{
-  "name": "savings_balance",
-  "type": "string",
-  "description": "Current savings balance."
-}
-```
+Raw rendered card text is never inserted into a CSS selector. This prevents multiline text, quotes, `$`, `+`, and other CSS-sensitive characters from creating malformed selectors.
 
-The current prototype represents the balance as a string because the mock UI displays a formatted currency value. A production schema could introduce richer types such as currency, decimal, date, account identifier, or domain-specific records.
+The model is instructed to return one JSON action. As defensive parsing, BankPilot extracts exactly the first valid JSON object. Appended prose or an accidental second object no longer causes `JSONDecodeError: Extra data`. Pydantic still validates the parsed action before use.
 
-### Ordered Actions
+## 8. Consequential-action safety
 
-The artifact records an ordered sequence such as:
+The model proposes actions, but application code decides whether they may execute.
 
-```text
-step_1 → type
-step_2 → click
-step_3 → extract
-```
+### Domain and action restrictions
 
-Each action contains enough information for replay without consulting the LLM.
+The demo allows only `127.0.0.1` and `localhost`. Discovery and replay recognize only approved action types. The model cannot supply arbitrary selectors or code.
 
-### Target Identification
+### Review-before-commit
 
-Interactive targets contain both semantic and structural information:
+Sub-account creation and deposits use a two-layer boundary:
 
-```json
-{
-  "role": "button",
-  "name": "Search",
-  "selector": "button[type=\"submit\"]"
-}
-```
+1. policy blocks `Confirm & Open` and `Post Deposit`; and
+2. the mock commit endpoints return HTTP `403` without changing data.
 
-Replay prefers semantic role/name identification and can fall back to the recorded selector.
+The requested capability is therefore preparation—not autonomous financial commitment.
 
-This is more robust than storing only an absolute DOM path or screen coordinate.
+### Production direction
 
-### Data Extraction
+Keyword matching is intentionally conservative and suitable only for a prototype. Production actions should carry explicit classifications such as `READ_ONLY`, `LOW_RISK_WRITE`, `FINANCIAL_ACTION`, `DESTRUCTIVE_ACTION`, and `PRIVILEGED_ACTION`. Tenant policy could then allow, deny, require approval, or require step-up authentication.
 
-The demonstration capability contains an explicit extraction step:
+## 9. Determinism and error handling
 
-```json
-{
-  "action": "extract",
-  "value": "Savings Balance"
-}
-```
+Replay resolves placeholders from validated runtime input and dispatches directly on recorded step types. It distinguishes:
 
-The replay engine locates the corresponding table row and extracts the value.
+- success;
+- expected business outcomes such as `MEMBER_NOT_FOUND`;
+- recoverable transient conditions;
+- hard execution failures; and
+- human intervention requirements.
 
-This is intentionally separate from clicking and typing because returning structured data is part of the capability contract.
+Retries are bounded. A recovered step is recorded in the final result. Persistent failures include the failed step, expected behavior, observed page summary, error information, and screenshot evidence.
 
-### Success Condition
+After execution, replay validates the capability success condition to prevent false success caused by technically successful browser calls ending on the wrong page.
 
-The capability contains a machine-checkable success condition:
+## 10. Human handoff
 
-```json
-{
-  "type": "text_present",
-  "value": "Member Details"
-}
-```
+Member `10025` demonstrates same-session intervention. Automation pauses on the verification page, the browser remains open, a human completes the required action, and replay resumes in the same page and session.
 
-Replay is therefore not considered successful merely because every browser operation executed without throwing an exception. The final application state must also satisfy the recorded condition.
+The prototype records `handoff_started` and `handoff_completed`. A production implementation would replace terminal input with an operator queue containing the reason, current step, screenshot, safe context, ownership, timeout, and resume/cancel authorization.
 
-### Decoupling from the Model Transcript
+## 11. Surface abstraction
 
-The raw model reasoning is not the artifact.
+The shared `Surface` contract separates workflow semantics from interaction technology.
 
-For example, an LLM may say during discovery that a particular member number is already entered. That sentence is not persisted as an execution instruction.
+- `BrowserSurface` is operational through Playwright.
+- `TerminalSurface` provides a restricted executable allowlist, calls subprocesses with `shell=False`, and refuses arbitrary LLM-generated commands.
+- `DesktopSurface` defines an accessibility-tree extension point with application allowlisting. Platform accessibility providers are not yet implemented.
 
-Instead the artifact contains deterministic descriptions such as:
+Pixel-coordinate clicking and unrestricted shell execution are deliberately excluded. Desktop execution should use stable accessibility elements and foreground-application checks before it is enabled.
 
-```text
-Enter value into Member Id.
-Click Search.
-Extract the current savings balance.
-```
+## 12. Observability
 
-This makes the artifact reviewable and reusable independently of the model that discovered it.
+Discovery and replay emit JSONL events. Discovery output now includes page title, URL, chosen action, target name, selector, and post-action URL. This makes unexpected navigation diagnosable.
 
----
+Representative events include:
 
-## 3. Determinism & error handling
-
-Replay is designed around deterministic execution.
-
-Given the same:
-
-```text
-capability
-runtime parameters
-application state
-```
-
-the replay engine executes the same ordered steps without asking an LLM what to do next.
-
-### No LLM in the Replay Decision Loop
-
-The discovery path uses `LLMClient`.
-
-The replay path reads the capability and dispatches directly on recorded step types such as:
-
-```text
-TYPE
-CLICK
-WAIT
-EXTRACT
-```
-
-There is no model call for deciding the next replay action.
-
-This is important for repeatability, latency, cost, reviewability, and safety.
-
-### Parameter Resolution
-
-A template such as:
-
-```text
-{{member_id}}
-```
-
-is deterministically resolved from replay inputs.
-
-For example:
-
-```text
-{{member_id}} + member_id=10024
-```
-
-becomes the runtime value used by the TYPE action.
-
-### Expected Business Outcomes
-
-A valid application response is not automatically an automation failure.
-
-The demonstration includes an unknown member lookup. LegacyBank correctly returns:
-
-```text
-Member not found
-```
-
-BankPilot classifies this as:
-
-```json
-{
-  "status": "business_outcome",
-  "code": "MEMBER_NOT_FOUND"
-}
-```
-
-This distinguishes domain outcomes from execution failures.
-
-### Recoverable Conditions
-
-Some failures may be transient.
-
-Replay therefore supports bounded deterministic retries. The demonstration injects a controlled temporary target failure.
-
-The execution behaves as:
-
-```text
-step fails
-   |
-   v
-bounded wait
-   |
-   v
-retry
-   |
-   v
-target becomes available
-   |
-   v
-continue replay
-```
-
-The final result records the recovered step:
-
-```json
-"recovered_steps": [
-  "step_2"
-]
-```
-
-Retries are bounded to avoid infinite loops and hidden nondeterministic behavior.
-
-### Hard Failures
-
-If the condition remains unresolved after the configured retry limit, replay returns a structured failure.
-
-Example:
-
-```json
-{
-  "status": "failure",
-  "code": "STEP_EXECUTION_FAILED",
-  "failed_step": "step_2",
-  "expected": "Action 'click' on target 'Search'.",
-  "evidence_path": "evidence/failure_step_2.png"
-}
-```
-
-The failure includes:
-
-- failing step
-- error code
-- message
-- expected operation
-- observed page summary
-- recovered steps before failure
-- screenshot path when capture succeeds
-
-This is more useful than returning only a generic browser exception.
-
-### Success Validation
-
-After all recorded steps execute, the replay engine evaluates the capability success condition.
-
-This protects against false success where browser calls technically succeed but the application ends in an unexpected state.
-
-### Observability
-
-Replay emits JSONL events including:
-
-```text
+~~~text
+discovery_started
+observation
+agent_decision
+action_executed
+discovery_completed
+discovery_failed
 replay_started
 step_started
-step_completed
 step_retry
 step_recovered
 output_extracted
 business_outcome
-replay_completed
-replay_failed
-```
-
-This allows a run to be reconstructed without depending solely on terminal output.
-
----
-
-## 4. Heterogeneity & multi-tenant
-
-The prototype implements a browser surface, but the architecture separates workflow semantics from the underlying UI mechanism.
-
-The capability describes operations such as:
-
-```text
-type
-click
-extract
-wait
-```
-
-rather than directly storing executable Python or arbitrary Playwright programs.
-
-### Surface Abstraction
-
-The current implementation uses:
-
-```text
-BrowserSurface → Playwright → LegacyBank
-```
-
-A broader system could introduce additional adapters:
-
-```text
-BrowserSurface
-DesktopSurface
-TerminalSurface
-MobileSurface
-```
-
-Each adapter would expose normalized observations and a constrained action vocabulary.
-
-The discovery and capability layers would therefore not need to understand the complete implementation details of every UI technology.
-
-### Imperfect DOMs
-
-The mock LegacyBank interface intentionally does not rely on test-specific IDs for every interaction.
-
-The capability records both semantic target information and selector fallback information.
-
-For heterogeneous browser applications, target resolution could evolve into a ranked strategy:
-
-```text
-stable application identifier
-        ↓
-semantic role + name
-        ↓
-label relationship
-        ↓
-recorded selector
-        ↓
-relative structural locator
-        ↓
-visual locator
-        ↓
-human escalation
-```
-
-This would support older enterprise applications where accessibility metadata and DOM structure are inconsistent.
-
-### Multi-Tenant Reuse
-
-A production system should not create independent executable code for every tenant.
-
-Instead, the capability should remain a logical workflow while tenant-specific differences are supplied through configuration.
-
-Conceptually:
-
-```text
-Capability
-   |
-   +--- tenant configuration
-   |
-   +--- application profile
-   |
-   +--- surface adapter
-   |
-   +--- policy profile
-```
-
-Tenant configuration could contain:
-
-- approved domains
-- application base URL
-- locator overrides
-- feature flags
-- timeout profiles
-- authentication strategy
-- tenant-specific business outcome mappings
-
-The capability would continue to express the business workflow.
-
-### Capability Identity
-
-A production registry could identify capabilities using:
-
-```text
-capability_id
-schema_version
-capability_version
-application
-tenant compatibility
-```
-
-This would allow controlled rollout, review, rollback, and migration across customers.
-
-### Limits of the Prototype
-
-The submitted implementation demonstrates the architectural boundary rather than implementing a full multi-tenant registry or multiple surface technologies.
-
-The primary implemented surface is browser-based Playwright automation against LegacyBank.
-
----
-
-## 5. Escalation & handoff
-
-BankPilot supports human intervention without discarding the active browser session.
-
-This is important for workflows containing steps that should not or cannot be automated safely.
-
-### Demonstrated Scenario
-
-Member `10025` requires manual verification.
-
-The flow is:
-
-```text
-Replay starts
-    |
-    v
-member lookup
-    |
-    v
-Manual Verification Required
-    |
-    v
-AUTOMATION PAUSES
-    |
-    v
-human uses existing browser
-    |
-    v
-human completes verification
-    |
-    v
-human signals completion
-    |
-    v
-AUTOMATION RESUMES
-    |
-    v
-Savings Balance extracted
-```
-
-The browser is not closed during handoff.
-
-The human operates the same Playwright-created browser page, preserving the live application context.
-
-After the human completes verification and confirms continuation in the terminal, replay observes the resulting state and continues.
-
-### Same-Session Resume
-
-The handoff manager intentionally retains:
-
-```text
-browser
-page
-current navigation state
-session state
-```
-
-No new replay is started from the beginning.
-
-The demonstrated result completes with:
-
-```text
-Human handoffs: 1
-```
-
-and extracts the requested balance after intervention.
-
-### Handoff Observability
-
-The handoff path logs:
-
-```text
 handoff_started
 handoff_completed
-```
-
-alongside normal replay events.
-
-This provides evidence that manual intervention occurred rather than silently treating the workflow as fully automated.
-
-### Production Extension
-
-A production implementation could replace the terminal confirmation with a task queue or operator console.
-
-The handoff package would provide the operator with:
-
-- reason for escalation
-- current application
-- current workflow step
-- screenshot
-- relevant non-sensitive context
-- allowed intervention instructions
-- resume/cancel controls
-
-The execution session could be held by a worker while the human task is outstanding, or serialized using an approved session continuation mechanism where supported.
-
----
-
-## 6. Safety
-
-Safety is enforced outside the LLM rather than relying solely on model instructions.
-
-The model proposes an action, but application code decides whether that action may execute.
-
-### Domain Allowlist
-
-Navigation is restricted to approved hosts.
-
-The demonstration permits:
-
-```text
-127.0.0.1
-localhost
-```
-
-An attempt to navigate to an unapproved domain such as `example.com` raises a safety violation.
-
-This prevents a discovered or replayed workflow from silently leaving its approved application boundary.
-
-### Action Allowlist
-
-Discovery is restricted to the defined action vocabulary:
-
-```text
-click
-type
-read
-wait
-finish
-escalate
-```
-
-The model cannot request arbitrary code execution.
-
-Replay similarly executes only recognized capability step types.
-
-### Risky Actions
-
-The prototype identifies potentially destructive or sensitive operations using a conservative set of risky terms, including operations related to:
-
-```text
-deletion
-money transfer
-withdrawal
-account closure
-payment approval
-```
-
-For example, clicking:
-
-```text
-Delete Account
-```
-
-is blocked by the safety policy.
-
-### Safety During Replay
-
-Safety is not limited to discovery.
-
-Replay checks:
-
-- start URL
-- current URL
-- replay action
-- target information
-
-This prevents a reviewed artifact from bypassing runtime safety controls.
-
-### Secret and Data Handling
-
-Secrets are loaded from environment variables rather than committed source code.
-
-`.env` is excluded by `.gitignore`.
-
-Structured logs redact keys associated with secrets and sensitive identifiers.
-
-The capability artifact parameterizes the member identifier rather than storing the discovery value as a reusable workflow constant.
-
-The implementation deliberately avoids persisting the full raw UI body or raw LLM transcript in discovery logs.
-
-### Production Safety Model
-
-The current risky-action classifier is keyword-based and is appropriate only for this prototype.
-
-A production implementation should attach structured risk metadata to capability operations, for example:
-
-```text
-READ_ONLY
-LOW_RISK_WRITE
-FINANCIAL_ACTION
-DESTRUCTIVE_ACTION
-PRIVILEGED_ACTION
-```
-
-Policy could then require:
-
-```text
-allow
-deny
-human approval
-step-up authentication
-```
-
-based on tenant configuration, user permissions, environment, and capability version.
-
-High-risk capabilities should also require explicit review before publication to a capability registry.
-
----
-
-## 7. Cuts
-
-This submission intentionally focuses on the core architectural problem rather than attempting to build a complete enterprise automation platform.
-
-### Local Mock Application
-
-I used a local LegacyBank application instead of automating a real banking website.
-
-This provides a safe, deterministic environment for demonstrating discovery, replay, business outcomes, failures, and handoff without depending on third-party terms of service, authentication, rate limits, or changing production UI.
-
-### Browser Surface Only
-
-The architecture discusses multiple surface types, but only the Playwright browser adapter is implemented.
-
-Given more time, I would implement the same normalized surface contract for another heterogeneous surface, such as a desktop application or terminal interface.
-
-### Simple Extraction Strategy
-
-The demonstration extracts the savings balance from a table row identified by its label.
-
-A production system should support typed extraction rules such as:
-
-```text
-text
-currency
-date
-table
-record
-list
-```
-
-and multiple extraction strategies.
-
-### Prototype Locator Strategy
-
-Replay currently uses semantic role/name targeting with selector fallback.
-
-A production locator system should maintain ranked locator candidates, confidence, application-specific overrides, and controlled healing/versioning rather than silently modifying capabilities.
-
-### Keyword-Based Risk Detection
-
-Risky-action detection is intentionally simple.
-
-A production implementation should use explicit operation risk classifications and authorization policies rather than relying primarily on target text.
-
-### In-Process Human Handoff
-
-The prototype pauses on terminal input while keeping the browser alive.
-
-A production system would use an operator queue, durable workflow state, ownership/lease management, timeout handling, and auditable resume authorization.
-
-### Authentication
-
-The demonstration does not automate real authentication or persist credentials.
-
-Production authentication should integrate with an approved secret manager and tenant identity model while keeping credentials outside capability artifacts and logs.
-
-### Capability Registry
-
-Artifacts are stored as local JSON files.
-
-A production implementation would use a registry providing:
-
-```text
-versioning
-review status
-ownership
-tenant compatibility
-audit history
-rollback
-migration
-deprecation
-```
-
-### Observability Backend
-
-The prototype uses JSONL logs and screenshots because they are simple, inspectable evidence for the take-home.
-
-Production execution would emit structured traces, metrics, and events to a centralized observability system with retention and access controls.
-
-### Testing Scope
-
-The project contains focused validation and scenario tests, including:
-
-```text
-successful discovery
-successful replay
-parameterization
-business outcome
-recoverable condition
-hard failure
-safety enforcement
-human handoff
-```
-
-Given more time, I would add broader unit coverage, browser integration tests in CI, schema migration tests, fuzz testing for artifacts, and property-based testing for parameter substitution and policy boundaries.
-
-### Final Tradeoff
-
-The main priority was to make the central architecture concrete and defensible:
-
-```text
-LLM discovers
-      ↓
-structured artifact captures capability
-      ↓
-deterministic engine replays it
-      ↓
-safety remains outside the model
-      ↓
-failures are explicit
-      ↓
-humans can intervene without losing context
-```
-
-The deliberately omitted production infrastructure is separable from that core design rather than being required to demonstrate it.
+replay_completed
+replay_failed
+~~~
+
+Failure paths capture screenshots when possible. Secrets remain in environment variables and are excluded from artifacts and source control.
+
+## 13. Evaluation
+
+The following deterministic validations were executed successfully:
+
+~~~text
+6/6 security boundary tests passed
+4/4 multi-operation portal tests passed
+~~~
+
+Observed live discovery results:
+
+| Scenario | Observed result |
+| --- | --- |
+| Member Lookup | Member `10023`, Alex Morgan |
+| Balance Lookup | Member `10024`, Savings, `$2150.75` |
+| Create Sub-account | Holiday Savings / Vacation reached `/sub-account/review`; not opened |
+| Deposit | `$200.00` to Savings with Cash deposit memo reached `/deposit/review`; not posted |
+
+The project also demonstrates deterministic replay with a new member parameter, a recognized member-not-found business outcome, bounded recovery after one retry, structured hard failure evidence, and one same-session human handoff.
+
+## 14. Deliberate cuts and limitations
+
+The project is a safe prototype rather than a production banking automation platform.
+
+- Member and account data are local mock records rather than a database-backed core.
+- Authentication, authorization, roles, and real credentials are not implemented.
+- No real account is opened and no money is moved.
+- Desktop support is an interface and policy boundary, not a platform implementation.
+- Terminal execution is restricted and is not yet connected to the discovery action vocabulary.
+- The risk classifier is keyword-based rather than policy-metadata-based.
+- Extraction currently uses simple labeled table rows.
+- Artifacts are local JSON rather than a reviewed capability registry.
+- Logs and screenshots are local rather than a centralized observability backend.
+- Browser integration tests are manually launched rather than continuously executed in CI.
+
+## 15. Production extensions
+
+A production path would add:
+
+- a capability registry with ownership, versions, approval, rollback, and migration;
+- tenant application profiles and locator overrides;
+- structured permissions and risk metadata;
+- durable workflow state and operator handoff queues;
+- secret-manager and identity-provider integration;
+- typed currency, date, table, list, and record extraction;
+- ranked locator candidates with controlled healing;
+- browser integration tests, fuzzing, and policy property tests in CI; and
+- centralized traces, metrics, audit events, retention, and access control.
+
+The core invariant remains:
+
+~~~text
+LLM discovers -> typed artifact records -> deterministic engine replays
+       -> policy remains outside the model -> humans approve consequential actions
+~~~
