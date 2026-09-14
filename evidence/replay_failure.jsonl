@@ -1,7 +1,10 @@
-{"timestamp": "2026-09-12T19:44:41.023399+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
-{"timestamp": "2026-09-12T19:44:41.069581+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
-{"timestamp": "2026-09-12T19:44:41.089413+00:00", "event": "step_completed", "step_id": "step_1"}
-{"timestamp": "2026-09-12T19:44:41.090584+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
-{"timestamp": "2026-09-12T19:44:41.093435+00:00", "event": "step_retry", "step_id": "step_2", "attempt": 1, "error": "Search target remained unavailable."}
-{"timestamp": "2026-09-12T19:44:41.594202+00:00", "event": "step_retry", "step_id": "step_2", "attempt": 2, "error": "Search target remained unavailable."}
-{"timestamp": "2026-09-12T19:44:42.160786+00:00", "event": "replay_failed", "code": "STEP_EXECUTION_FAILED", "failed_step": "step_2", "message": "Search target remained unavailable.", "evidence_path": "evidence/failure_step_2.png"}
+{"event":"evidence_metadata","source":"sanitized_from_verified_terminal_run","captured_on":"2026-09-14","fixture":"evidence/example_capability.json","timestamps_omitted":true}
+{"event":"replay_started","capability_id":"lookup_savings_balance","capability_name":"Lookup Savings Balance"}
+{"event":"step_started","step_id":"step_1","action":"click","target":"Member Lookup"}
+{"event":"step_completed","step_id":"step_1"}
+{"event":"step_started","step_id":"step_2","action":"type","target":"Member Number"}
+{"event":"step_completed","step_id":"step_2"}
+{"event":"step_started","step_id":"step_3","action":"click","target":"Search Member"}
+{"event":"step_retry","step_id":"step_3","attempt":1,"error":"Search target remained unavailable."}
+{"event":"step_retry","step_id":"step_3","attempt":2,"error":"Search target remained unavailable."}
+{"event":"replay_failed","code":"STEP_EXECUTION_FAILED","failed_step":"step_3","message":"Search target remained unavailable.","expected":"Action 'click' on target 'Search Member'.","evidence_path":"evidence/failure_step_3.png"}
