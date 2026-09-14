@@ -75,6 +75,27 @@ Expected boundaries:
 
 Representative sanitized schema-1.1 artifacts are committed in `artifacts/`. The sub-account and deposit JSONL files in `evidence/` are sanitized from verified live mock-portal runs; new runs replace/extend runtime evidence locally.
 
+## Automatic capability routing
+
+`CapabilityRouter` adds the discover-once/replay-next-time lifecycle. It searches `config/capability_registry.json` within the requested tenant and application before using an LLM:
+
+```text
+approved match -> deterministic replay; no discovery LLM call
+draft match    -> approval_required; no execution
+no match       -> bounded discovery_required
+discovery done -> save artifact as draft -> human review -> approve -> future replay
+```
+
+Test the complete lifecycle without an API key or browser:
+
+```bash
+python -m tests.test_capability_router
+```
+
+Expected output is `3/3 capability router lifecycle tests passed`. The test proves that a known approved request does not call discovery, an unknown address-change request is discovered only once and cannot replay while draft, approval enables later replay with a different member input, and a capability approved for one tenant is unavailable to another tenant.
+
+The initial registry contains the four reviewed demo capabilities. Matching currently uses deterministic normalized intent-token similarity, not another LLM. In a production service, registration and approval would be authenticated API operations backed by a database and immutable audit log.
+
 ## Verification
 
 Run checks that do not require an API key:
@@ -83,6 +104,7 @@ Run checks that do not require an API key:
 python -m tests.test_security_boundaries
 python -m tests.test_mock_subaccount
 python -m tests.test_capability_outputs
+python -m tests.test_capability_router
 ```
 
 Then verify deterministic success and exceptional paths while the portal is running:
@@ -112,6 +134,7 @@ Verified deterministic outputs:
 5/5 security boundary tests passed
 4/4 multi-operation portal tests passed
 5/5 capability output contracts passed
+3/3 capability router lifecycle tests passed
 ```
 
 ## Safety boundaries

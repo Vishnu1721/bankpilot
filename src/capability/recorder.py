@@ -1,4 +1,6 @@
 import json
+import hashlib
+import re
 from pathlib import Path
 
 from src.agent.models import ActionType
@@ -57,7 +59,7 @@ class CapabilityRecorder:
             )
         )
 
-    def build_capability(self, start_url, goal="", result=None):
+    def build_capability(self, start_url, goal="", result=None, final_observation=None):
         goal_text = goal.lower()
         steps = list(self.recorded_steps)
 
@@ -133,7 +135,7 @@ class CapabilityRecorder:
             ))
             success = SuccessCondition(type="text_present", value="Member Details")
 
-        else:
+        elif "savings" in goal_text and "balance" in goal_text:
             capability_id = "lookup_savings_balance"
             display_name = "Lookup Savings Balance"
             description = "Find a member and return their current savings balance."
@@ -165,6 +167,20 @@ class CapabilityRecorder:
                 type="text_present",
                 value="Balance Result" if used_balance_lookup else "Member Details",
             )
+
+        else:
+            normalized_goal = " ".join(re.findall(r"[a-z]+", goal_text))
+            goal_hash = hashlib.sha256(normalized_goal.encode("utf-8")).hexdigest()[:8]
+            capability_id = f"discovered_{goal_hash}"
+            display_name = "Discovered Workflow"
+            description = goal.strip() or "LLM-discovered workflow."
+            outputs = []
+            checkpoint = (
+                final_observation.title
+                if final_observation and final_observation.title
+                else "Workflow Complete"
+            )
+            success = SuccessCondition(type="text_present", value=checkpoint)
 
         parameter_definitions = [
             ParameterDefinition(

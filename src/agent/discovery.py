@@ -98,6 +98,7 @@ class DiscoveryAgent:
                         start_url,
                         goal=goal,
                         result=action.result,
+                        final_observation=observation,
                     )
                     if artifact_path:
                         self.recorder.save(capability, artifact_path)
