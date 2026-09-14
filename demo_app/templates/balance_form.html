@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Balance Lookup</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header class="header"><div><span class="brand-mark">LB</span> LegacyBank Credit Union</div><a class="header-link" href="/">Operations</a></header>
+<main class="container form-page"><div class="eyebrow">ACCOUNT INFORMATION · READ ONLY</div><h1>Balance Lookup</h1>
+<form action="{{ url_for('show_balance') }}" method="post">
+<label for="member_id">Member Number</label><input id="member_id" name="member_id" required>
+<label for="account_type">Account Type</label>
+<select id="account_type" name="account_type" required><option value="">Choose account</option><option>Checking</option><option>Savings</option></select>
+<button type="submit">View Balance</button></form>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+</main></body></html>
