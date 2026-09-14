@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Review New Sub-account</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><div class="header">LegacyBank Credit Union Console</div>
+<div class="container"><div class="eyebrow">ACCOUNT OPENING · CONFIRMATION REVIEW</div>
+<h2>Review New Sub-account</h2>
+<div class="notice">Review reached. No account has been opened and no data has changed.</div>
+<table class="review">
+<tr><td>Member Number</td><td>{{ member_id }}</td></tr>
+<tr><td>Member Name</td><td>{{ member.name }}</td></tr>
+<tr><td>Account Type</td><td>{{ account_type }}</td></tr>
+<tr><td>Nickname</td><td>{{ nickname }}</td></tr></table>
+<form action="{{ url_for('commit_subaccount') }}" method="post">
+<button class="danger" type="submit">Confirm &amp; Open</button></form>
+<p>The automation must stop here. Final commitment requires a human.</p>
+</div></body></html>

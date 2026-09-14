@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Deposit Review</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header class="header"><div><span class="brand-mark">LB</span> LegacyBank Credit Union</div><a class="header-link" href="/">Operations</a></header>
+<main class="container"><div class="eyebrow">TRANSACTIONS · CONFIRMATION REVIEW</div><h1>Deposit Review</h1>
+<div class="notice">Review reached. No funds have been posted and balances are unchanged.</div>
+<table class="review"><tr><td>Member</td><td>{{ member.name }} ({{ member_id }})</td></tr><tr><td>Destination</td><td>{{ account_type }}</td></tr><tr><td>Amount</td><td>${{ amount }}</td></tr><tr><td>Memo</td><td>{{ memo }}</td></tr></table>
+<form action="{{ url_for('commit_deposit') }}" method="post"><button class="danger" type="submit">Post Deposit</button></form>
+<p class="safety-note">BankPilot must stop here. Posting requires human approval.</p>
+</main></body></html>

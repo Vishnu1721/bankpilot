@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Prepare Deposit</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header class="header"><div><span class="brand-mark">LB</span> LegacyBank Credit Union</div><a class="header-link" href="/">Operations</a></header>
+<main class="container form-page"><div class="eyebrow">TRANSACTIONS · DRAFT</div><h1>Prepare Deposit</h1>
+<p>Prepare deposit details. The agent stops before posting.</p>
+<form action="{{ url_for('review_deposit') }}" method="post">
+<label for="member_id">Member Number</label><input id="member_id" name="member_id" required>
+<label for="account_type">Destination Account</label>
+<select id="account_type" name="account_type" required><option value="">Choose account</option><option>Checking</option><option>Savings</option></select>
+<label for="amount">Deposit Amount</label><input id="amount" name="amount" type="number" min="0.01" max="10000" step="0.01" placeholder="0.00" required>
+<label for="memo">Memo</label><input id="memo" name="memo" placeholder="Optional memo">
+<button type="submit">Continue to Deposit Review</button></form>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+</main></body></html>
