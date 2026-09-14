@@ -16,25 +16,25 @@
     <p class="lead">Choose an independent workflow. Review-only actions never change mock account data.</p>
 
     <section class="operation-grid" aria-label="Credit union operations">
-        <a class="operation-card" href="{{ url_for('member_search') }}">
+        <a class="operation-card" aria-label="Member Lookup" href="{{ url_for('member_search') }}">
             <span class="card-icon">M</span>
             <strong>Member Lookup</strong>
             <span>Search a member and view their profile and accounts.</span>
             <em>Read only</em>
         </a>
-        <a class="operation-card" href="{{ url_for('balance_lookup') }}">
+        <a class="operation-card" aria-label="Balance Lookup" href="{{ url_for('balance_lookup') }}">
             <span class="card-icon">B</span>
             <strong>Balance Lookup</strong>
             <span>Retrieve a checking or savings balance directly.</span>
             <em>Read only</em>
         </a>
-        <a class="operation-card" href="{{ url_for('subaccount_start') }}">
+        <a class="operation-card" aria-label="Create Sub-account" href="{{ url_for('subaccount_start') }}">
             <span class="card-icon">A+</span>
             <strong>Create Sub-account</strong>
             <span>Prepare a new savings product and reach review.</span>
             <em class="approval">Approval required</em>
         </a>
-        <a class="operation-card" href="{{ url_for('deposit_start') }}">
+        <a class="operation-card" aria-label="Deposit" href="{{ url_for('deposit_start') }}">
             <span class="card-icon">$</span>
             <strong>Deposit</strong>
             <span>Prepare a deposit and reach the posting review.</span>
