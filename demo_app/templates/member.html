@@ -1,49 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Member Details</title>
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
-</head>
-
-<body>
-
-<div class="header">
-    LegacyBank Administration Console
-</div>
-
-<div class="container">
-
-    <h2>Member Details</h2>
-
-    <table class="details">
-
-        <tr>
-            <td>Member Number</td>
-            <td>{{ member_id }}</td>
-        </tr>
-
-        <tr>
-            <td>Member Name</td>
-            <td>{{ member.name }}</td>
-        </tr>
-
-        <tr>
-            <td>Checking Balance</td>
-            <td>${{ member.checking }}</td>
-        </tr>
-
-        <tr>
-            <td>Savings Balance</td>
-            <td>${{ member.savings }}</td>
-        </tr>
-
-    </table>
-
-    <a href="/">Return to Member Search</a>
-
-</div>
-
-</body>
-</html>
+<html lang="en"><head><meta charset="UTF-8"><title>Member Details</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><div class="header">LegacyBank Credit Union Console</div>
+<div class="container"><div class="eyebrow">MEMBER SERVICING</div><h2>Member Details</h2>
+<table class="details">
+<tr><td>Member Number</td><td>{{ member_id }}</td></tr>
+<tr><td>Member Name</td><td>{{ member.name }}</td></tr>
+<tr><td>Checking Balance</td><td>${{ member.checking }}</td></tr>
+<tr><td>Savings Balance</td><td>${{ member.savings }}</td></tr>
+</table><div class="actions">
+<a class="button" href="{{ url_for('new_subaccount', member_id=member_id) }}">Open New Sub-account</a>
+<a href="/">Return to Member Search</a>
+</div></div></body></html>
