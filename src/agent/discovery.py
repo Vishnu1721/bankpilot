@@ -70,6 +70,7 @@ class DiscoveryAgent:
                 budget.record_observation(observation)
 
                 print(f"Page: {observation.title}")
+                print(f"URL: {observation.url}")
                 self.logger.log(
                     "observation",
                     step=step_number,
@@ -83,6 +84,12 @@ class DiscoveryAgent:
                 action = self.llm.decide(goal, observation)
                 print(f"Decision: {action.action.value}")
                 print(f"Reason: {action.reasoning}")
+                if action.element_id:
+                    target = next(
+                        element for element in observation.elements
+                        if element.element_id == action.element_id
+                    )
+                    print(f"Target: {target.name} [{target.selector}]")
 
                 self.logger.log(
                     "agent_decision",
@@ -122,6 +129,12 @@ class DiscoveryAgent:
 
                 self.recorder.record_action(action, observation)
                 self.surface.execute(action, observation)
+                current_url = (
+                    self.surface.page.url
+                    if hasattr(self.surface, "page") and self.surface.page
+                    else observation.url
+                )
+                print(f"After action URL: {current_url}")
                 self.logger.log(
                     "action_executed",
                     step=step_number,
