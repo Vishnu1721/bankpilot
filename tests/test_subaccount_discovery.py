@@ -4,13 +4,12 @@ from src.surface.browser import BrowserSurface
 
 
 GOAL = (
-    "Look up member 10023, prepare a Holiday Savings sub-account "
-    "named Vacation, and reach the confirmation review screen. "
+    "From the operations dashboard, create a Holiday Savings sub-account "
+    "for member 10023 named Vacation and reach the confirmation review. "
     "Do not confirm or open the account."
 )
 START_URL = "http://127.0.0.1:5001"
 ARTIFACT_PATH = "artifacts/prepare_new_subaccount.json"
-
 
 surface = BrowserSurface(headless=False)
 
@@ -20,8 +19,8 @@ try:
     agent = DiscoveryAgent(
         surface=surface,
         budget=DiscoveryBudget(
-            max_steps=9,
-            max_llm_calls=9,
+            max_steps=8,
+            max_llm_calls=8,
             max_elapsed_seconds=90,
             max_observation_chars=8000,
             max_same_state=2,
