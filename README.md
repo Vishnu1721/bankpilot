@@ -518,6 +518,34 @@ Human handoffs: 1
 
 ---
 
+## Multi-operation Credit Union Portal
+
+The home page is now an employee operations dashboard with independent entry
+points. An agent does not need to perform member lookup before every task.
+
+| Operation | Goal boundary | Artifact |
+| --- | --- | --- |
+| Member Lookup | Member details displayed | `lookup_member.json` |
+| Balance Lookup | Requested balance displayed | `lookup_savings_balance.json` |
+| Create Sub-account | Confirmation review only | `prepare_new_subaccount.json` |
+| Deposit | Deposit review only | `prepare_deposit.json` |
+
+The deposit and sub-account commit endpoints always return HTTP 403. They exist
+only to prove that a second server-side boundary protects the mock application.
+
+Run deterministic portal checks:
+
+```bash
+python -m tests.test_mock_subaccount
+```
+
+Run independent LLM discovery demonstrations after starting the demo app:
+
+```bash
+python -m tests.test_subaccount_discovery
+python -m tests.test_deposit_discovery
+```
+
 ## Safe Sub-account Review Workflow
 
 The expanded credit-union mock supports a second goal:
