@@ -1,0 +1,42 @@
+[
+  {
+    "capability_id": "lookup_savings_balance",
+    "version": "1.0.0",
+    "status": "approved",
+    "artifact_path": "evidence/example_capability.json",
+    "tenant_id": "default",
+    "application": "LegacyBank Credit Union",
+    "intents": ["look up savings balance", "read current savings balance"],
+    "approved_by": "demo-reviewer"
+  },
+  {
+    "capability_id": "lookup_member",
+    "version": "1.0.0",
+    "status": "approved",
+    "artifact_path": "artifacts/lookup_member.json",
+    "tenant_id": "default",
+    "application": "LegacyBank Credit Union",
+    "intents": ["look up member", "find member profile"],
+    "approved_by": "demo-reviewer"
+  },
+  {
+    "capability_id": "prepare_new_subaccount",
+    "version": "1.0.0",
+    "status": "approved",
+    "artifact_path": "artifacts/prepare_new_subaccount.json",
+    "tenant_id": "default",
+    "application": "LegacyBank Credit Union",
+    "intents": ["prepare new subaccount", "create sub account review", "open new sub account and reach confirmation review"],
+    "approved_by": "demo-reviewer"
+  },
+  {
+    "capability_id": "prepare_deposit",
+    "version": "1.0.0",
+    "status": "approved",
+    "artifact_path": "artifacts/prepare_deposit.json",
+    "tenant_id": "default",
+    "application": "LegacyBank Credit Union",
+    "intents": ["prepare deposit review", "deposit funds review"],
+    "approved_by": "demo-reviewer"
+  }
+]
