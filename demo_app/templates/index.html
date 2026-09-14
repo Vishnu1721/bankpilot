@@ -1,12 +1,53 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>LegacyBank Admin</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
-<body><div class="header">LegacyBank Credit Union Console</div>
-<div class="container"><div class="eyebrow">MEMBER SERVICING</div><h2>Member Search</h2>
-<p>Enter a member number to retrieve account information.</p>
-<form action="/member" method="post">
-<label for="member_id">Member Number</label>
-<input id="member_id" type="text" name="member_id" autocomplete="off">
-<button type="submit">Search</button></form>
-{% if error %}<div class="error">{{ error }}</div>{% endif %}
-</div></body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LegacyBank Operations</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="header">
+    <div><span class="brand-mark">LB</span> LegacyBank Credit Union</div>
+    <span class="operator">Operations Console · Demo</span>
+</header>
+<main class="container dashboard">
+    <div class="eyebrow">OPERATIONS CENTER</div>
+    <h1>How can we help a member?</h1>
+    <p class="lead">Choose an independent workflow. Review-only actions never change mock account data.</p>
+
+    <section class="operation-grid" aria-label="Credit union operations">
+        <a class="operation-card" href="{{ url_for('member_search') }}">
+            <span class="card-icon">M</span>
+            <strong>Member Lookup</strong>
+            <span>Search a member and view their profile and accounts.</span>
+            <em>Read only</em>
+        </a>
+        <a class="operation-card" href="{{ url_for('balance_lookup') }}">
+            <span class="card-icon">B</span>
+            <strong>Balance Lookup</strong>
+            <span>Retrieve a checking or savings balance directly.</span>
+            <em>Read only</em>
+        </a>
+        <a class="operation-card" href="{{ url_for('subaccount_start') }}">
+            <span class="card-icon">A+</span>
+            <strong>Create Sub-account</strong>
+            <span>Prepare a new savings product and reach review.</span>
+            <em class="approval">Approval required</em>
+        </a>
+        <a class="operation-card" href="{{ url_for('deposit_start') }}">
+            <span class="card-icon">$</span>
+            <strong>Deposit</strong>
+            <span>Prepare a deposit and reach the posting review.</span>
+            <em class="approval">Approval required</em>
+        </a>
+    </section>
+
+    <section class="demo-members">
+        <strong>Demo members</strong>
+        <span>10023 · Alex Morgan</span>
+        <span>10024 · Jordan Lee</span>
+        <span>10025 · Taylor Smith (verification)</span>
+    </section>
+</main>
+</body>
+</html>
