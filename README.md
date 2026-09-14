@@ -518,6 +518,73 @@ Human handoffs: 1
 
 ---
 
+## Safe Sub-account Review Workflow
+
+The expanded credit-union mock supports a second goal:
+
+```text
+Look up member 10023, prepare a Holiday Savings sub-account named
+Vacation, and reach the confirmation review screen. Do not confirm.
+```
+
+Run the mock application, then:
+
+```bash
+python -m tests.test_subaccount_discovery
+```
+
+Discovery records member lookup, account-type selection, nickname entry, and
+navigation to **Review New Sub-account**. It must finish there. The final
+**Confirm & Open** click is policy-blocked, and the mock commit endpoint returns
+HTTP 403, so this demo never creates an account or changes financial data.
+
+## Untrusted UI Defense
+
+Browser text, element names, labels, errors, and values are tagged as
+`untrusted_ui_data`. Only rendered text and visible controls are observed.
+Before an observation reaches the model, BankPilot:
+
+- normalizes control characters and whitespace
+- caps body, field, and element counts
+- detects common instruction/prompt-injection patterns
+- stops for human review when UI text tries to direct the agent
+- places policy in a system message and UI data in a clearly marked data envelope
+
+This is defense in depth rather than a claim that keyword detection alone solves
+prompt injection. The decisive boundary remains deterministic action validation,
+element binding, domain restriction, budgets, and human approval for consequential
+actions.
+
+## Explicit Discovery Budgets
+
+`DiscoveryBudget` applies independent hard limits for:
+
+- total steps
+- LLM calls
+- elapsed wall-clock time
+- observation characters
+- repeated identical states (no-progress loop)
+
+Budget configuration and consumption are logged. Exceeding any limit stops
+discovery with `DiscoveryBudgetExceeded`.
+
+Run the deterministic boundary tests without an API key:
+
+```bash
+python -m tests.test_security_boundaries
+python -m tests.test_mock_subaccount
+```
+
+## Multi-surface Direction
+
+The shared `Surface` protocol decouples discovery from Playwright.
+`BrowserSurface` is fully operational. `TerminalSurface` provides a restricted,
+no-shell executable allowlist and deliberately refuses arbitrary LLM commands.
+`DesktopSurface` is an explicit accessibility-tree extension point; platform
+accessibility providers and foreground-application checks must be implemented
+before it can execute desktop actions. Pixel-coordinate clicking is intentionally
+not part of the contract.
+
 ## Safety
 
 BankPilot applies safety checks before browser actions and replay operations.
