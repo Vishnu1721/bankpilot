@@ -1,6 +1,9 @@
-{"timestamp": "2026-09-12T19:44:32.940869+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "Lookup Savings Balance"}
-{"timestamp": "2026-09-12T19:44:32.986898+00:00", "event": "step_started", "step_id": "step_1", "action": "type", "target": "Member Id"}
-{"timestamp": "2026-09-12T19:44:33.005645+00:00", "event": "step_completed", "step_id": "step_1"}
-{"timestamp": "2026-09-12T19:44:33.007228+00:00", "event": "step_started", "step_id": "step_2", "action": "click", "target": "Search"}
-{"timestamp": "2026-09-12T19:44:33.110583+00:00", "event": "step_completed", "step_id": "step_2"}
-{"timestamp": "2026-09-12T19:44:33.119353+00:00", "event": "business_outcome", "code": "MEMBER_NOT_FOUND", "message": "Member not found"}
+{"event":"evidence_metadata","source":"sanitized_from_verified_terminal_run","captured_on":"2026-09-14","fixture":"evidence/example_capability.json","timestamps_omitted":true}
+{"event":"replay_started","capability_id":"lookup_savings_balance","capability_name":"Lookup Savings Balance"}
+{"event":"step_started","step_id":"step_1","action":"click","target":"Member Lookup"}
+{"event":"step_completed","step_id":"step_1"}
+{"event":"step_started","step_id":"step_2","action":"type","target":"Member Number"}
+{"event":"step_completed","step_id":"step_2"}
+{"event":"step_started","step_id":"step_3","action":"click","target":"Search Member"}
+{"event":"step_completed","step_id":"step_3"}
+{"event":"business_outcome","status":"business_outcome","code":"MEMBER_NOT_FOUND","message":"Member not found","outputs":{}}

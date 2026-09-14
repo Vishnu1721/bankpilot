@@ -95,7 +95,24 @@ python -m tests.test_hard_failure
 python -m tests.test_handoff
 ```
 
-The handoff demo uses member `10025`. It records capability, current step, URL, reason, screenshot, control owner, and the human action before resuming in the same browser session.
+The edge-case tests deliberately load the committed fixture `evidence/example_capability.json`, not the mutable artifact produced by `test_end_to_end`. This keeps their target names and injected failures reproducible even when LLM discovery chooses an equivalent route such as the dedicated Balance Lookup page.
+
+| Test | Verified expected result |
+| --- | --- |
+| `test_business_outcome` | Member `99999` returns `business_outcome` / `MEMBER_NOT_FOUND` after step 3; it is not retried as a UI failure. |
+| `test_recoverable_replay` | A simulated temporary Search Member failure retries once, succeeds, and reports `recovered_steps: ["step_3"]`. |
+| `test_hard_failure` | Search Member remains unavailable through two bounded retries, returns `STEP_EXECUTION_FAILED` at step 3, and saves `evidence/failure_step_3.png`. |
+| `test_handoff` | Member `10025` pauses after step 3, transfers control to the human, resumes in the same session, returns `$3675.20`, and reports one handoff. |
+
+For handoff, click **Complete Verification** in the preserved browser, return to the terminal, describe the action or press Enter for the default, and allow replay to continue. The log records capability, current step, URL, reason, screenshot, control owner, and human action. Each edge-case script now asserts its intended result, so an unintended ordinary success fails the test instead of looking valid.
+
+Verified deterministic outputs:
+
+```text
+5/5 security boundary tests passed
+4/4 multi-operation portal tests passed
+5/5 capability output contracts passed
+```
 
 ## Safety boundaries
 
