@@ -106,8 +106,12 @@ class BrowserSurface:
         }.get(tag, tag)
 
     def _get_element_name(self, control, tag):
+        aria_label = control.get_attribute("aria-label")
+        if aria_label:
+            return aria_label.strip()
+
         if tag in ("button", "a"):
-            return control.inner_text().strip()
+            return " ".join(control.inner_text().split())
 
         element_id = control.get_attribute("id")
         if element_id:
@@ -127,23 +131,53 @@ class BrowserSurface:
         return None
 
     def _build_selector(self, control, tag):
-        name = control.get_attribute("name")
-        if name:
-            return f'{tag}[name="{name}"]'
+        # Prefer stable attributes. Never interpolate rendered multi-line text
+        # into CSS because quotes/newlines can produce invalid selectors.
+        for attribute in ("data-testid", "aria-label", "name"):
+            value = control.get_attribute(attribute)
+            if value:
+                escaped = self._escape_css_attribute(value)
+                return f'{tag}[{attribute}="{escaped}"]'
 
         element_id = control.get_attribute("id")
         if element_id:
-            return f"#{element_id}"
+            escaped = self._escape_css_attribute(element_id)
+            return f'[id="{escaped}"]'
 
-        control_type = control.get_attribute("type")
-        if control_type:
-            return f'{tag}[type="{control_type}"]'
+        if tag == "a":
+            href = control.get_attribute("href")
+            if href:
+                escaped = self._escape_css_attribute(href)
+                return f'a[href="{escaped}"]'
 
-        text = control.inner_text().strip()
-        if text:
-            escaped = text.replace('"', '\\"')
-            return f'{tag}:has-text("{escaped}")'
-        return tag
+        # Last-resort XPath stays valid for multiline and quoted visible text.
+        return control.evaluate(
+            """(el) => {
+                const parts = [];
+                while (el && el.nodeType === 1) {
+                    let position = 1;
+                    let sibling = el.previousElementSibling;
+                    while (sibling) {
+                        if (sibling.tagName === el.tagName) position += 1;
+                        sibling = sibling.previousElementSibling;
+                    }
+                    parts.unshift(
+                        el.tagName.toLowerCase() + "[" + position + "]"
+                    );
+                    el = el.parentElement;
+                }
+                return "xpath=/" + parts.join("/");
+            }"""
+        )
+
+    @staticmethod
+    def _escape_css_attribute(value):
+        return (
+            value.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\a ")
+            .replace("\r", "")
+        )
 
     def close(self):
         if self.browser:
