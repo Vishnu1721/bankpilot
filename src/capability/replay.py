@@ -42,6 +42,8 @@ class ReplayEngine:
         self.retry_delay_ms = retry_delay_ms
 
         self.recovered_steps = []
+        self.active_capability_id = None
+        self.current_step_id = None
 
         self.logger = EventLogger(
             log_path
@@ -76,6 +78,8 @@ class ReplayEngine:
         )
 
         self.recovered_steps = []
+        self.active_capability_id = capability.capability_id
+        self.current_step_id = None
 
         self.logger.log(
             "replay_started",
@@ -104,6 +108,7 @@ class ReplayEngine:
             outputs = {}
 
             for step in capability.steps:
+                self.current_step_id = step.step_id
 
                 print(
                     f"\n--- {step.step_id} ---"

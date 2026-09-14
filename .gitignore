@@ -19,6 +19,10 @@ venv/
 
 # Runtime-generated artifacts
 artifacts/*.json
+!artifacts/lookup_member.json
+!artifacts/lookup_balance.json
+!artifacts/prepare_new_subaccount.json
+!artifacts/prepare_deposit.json
 
 # Temporary runtime files
 tmp/

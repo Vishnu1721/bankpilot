@@ -1,0 +1,7 @@
+{"event":"evidence_metadata","source":"sanitized_from_verified_live_demo","captured_on":"2026-09-14","note":"Mock member data; timestamps omitted"}
+{"event":"agent_decision","step":1,"action":"click","element_id":"Create Sub-account","reasoning":"Open the Create Sub-account workflow."}
+{"event":"agent_decision","step":2,"action":"type","element_id":"Member Number","reasoning":"Enter member 10023."}
+{"event":"agent_decision","step":3,"action":"select","element_id":"Account Type","reasoning":"Select Holiday Savings."}
+{"event":"agent_decision","step":4,"action":"type","element_id":"Account Nickname","reasoning":"Enter Vacation."}
+{"event":"agent_decision","step":5,"action":"click","element_id":"Continue to Review","reasoning":"Reach confirmation review without opening the account."}
+{"event":"discovery_completed","capability_id":"prepare_new_subaccount","final_url":"http://127.0.0.1:5001/sub-account/review","committed":false}

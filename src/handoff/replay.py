@@ -41,21 +41,36 @@ class HandoffReplayEngine(
         reason
     ):
         self.handoff_count += 1
+        page = self.surface.page
+        context = {
+            "capability_id": self.active_capability_id,
+            "step_id": self.current_step_id,
+            "url": page.url,
+            "page_title": page.title(),
+            "screenshot": "evidence/handoff_required.png",
+        }
 
         self.logger.log(
             "handoff_started",
-            reason=reason
+            reason=reason,
+            control_owner="human",
+            **context,
         )
 
-        self.handoff.handoff(
-            reason=reason
+        result = self.handoff.handoff(
+            reason=reason,
+            context=context,
         )
 
         self.logger.log(
             "handoff_completed",
-            handoff_number=(
-                self.handoff_count
-            )
+            handoff_number=self.handoff_count,
+            capability_id=self.active_capability_id,
+            step_id=self.current_step_id,
+            url=self.surface.page.url,
+            screenshot=result["screenshot"],
+            human_action=result["human_action"],
+            control_owner="automation",
         )
 
     def _detect_business_outcome(

@@ -10,6 +10,6 @@
 <select id="account_type" name="account_type" required><option value="">Choose account</option><option>Checking</option><option>Savings</option></select>
 <label for="amount">Deposit Amount</label><input id="amount" name="amount" type="number" min="0.01" max="10000" step="0.01" placeholder="0.00" required>
 <label for="memo">Memo</label><input id="memo" name="memo" placeholder="Optional memo">
-<button type="submit">Continue to Deposit Review</button></form>
+<button type="submit" aria-label="Continue to Deposit Review">Continue to Deposit Review</button></form>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 </main></body></html>

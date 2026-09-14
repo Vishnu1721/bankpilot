@@ -67,11 +67,16 @@ class CapabilityRecorder:
             description = "Prepare a deposit and stop before funds are posted."
             outputs = [
                 OutputDefinition(
-                    name="review_status",
+                    name="amount",
                     type="string",
-                    description="Deposit review reached without posting funds.",
+                    description="Deposit amount shown on the review screen.",
                 )
             ]
+            steps.append(CapabilityStep(
+                step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
+                target=None, value="Amount",
+                description="Extract the reviewed deposit amount.",
+            ))
             success = SuccessCondition(type="text_present", value="Deposit Review")
 
         elif "sub-account" in goal_text or "sub account" in goal_text:
@@ -80,12 +85,35 @@ class CapabilityRecorder:
             description = "Prepare a new sub-account and stop before account creation."
             outputs = [
                 OutputDefinition(
-                    name="review_status",
+                    name="account_type",
                     type="string",
-                    description="Sub-account confirmation review reached.",
+                    description="Account type shown on the confirmation review.",
                 )
             ]
+            steps.append(CapabilityStep(
+                step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
+                target=None, value="Account Type",
+                description="Extract the reviewed sub-account type.",
+            ))
             success = SuccessCondition(type="text_present", value="Review New Sub-account")
+
+        elif "balance lookup" in goal_text:
+            capability_id = "lookup_balance"
+            display_name = "Lookup Balance"
+            description = "Retrieve a selected account balance."
+            outputs = [
+                OutputDefinition(
+                    name="current_balance",
+                    type="string",
+                    description="Current balance for the selected account.",
+                )
+            ]
+            steps.append(CapabilityStep(
+                step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
+                target=None, value="Current Balance",
+                description="Extract the selected account balance.",
+            ))
+            success = SuccessCondition(type="text_present", value="Balance Result")
 
         elif "member lookup" in goal_text or "member profile" in goal_text:
             capability_id = "lookup_member"
@@ -93,11 +121,16 @@ class CapabilityRecorder:
             description = "Find a member and display their account profile."
             outputs = [
                 OutputDefinition(
-                    name="member_status",
+                    name="member_name",
                     type="string",
-                    description="Member profile lookup result.",
+                    description="Member name displayed by the lookup.",
                 )
             ]
+            steps.append(CapabilityStep(
+                step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
+                target=None, value="Member Name",
+                description="Extract the member name.",
+            ))
             success = SuccessCondition(type="text_present", value="Member Details")
 
         else:

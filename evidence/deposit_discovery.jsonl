@@ -1,0 +1,8 @@
+{"event":"evidence_metadata","source":"sanitized_from_verified_live_demo","captured_on":"2026-09-14","note":"Mock member data; timestamps omitted"}
+{"event":"agent_decision","step":1,"action":"click","element_id":"Deposit","reasoning":"Open the deposit workflow."}
+{"event":"agent_decision","step":2,"action":"type","element_id":"Member Number","reasoning":"Enter member 10024."}
+{"event":"agent_decision","step":3,"action":"select","element_id":"Destination Account","reasoning":"Select Savings."}
+{"event":"agent_decision","step":4,"action":"type","element_id":"Deposit Amount","reasoning":"Enter 200."}
+{"event":"agent_decision","step":5,"action":"type","element_id":"Memo","reasoning":"Enter Cash deposit."}
+{"event":"agent_decision","step":6,"action":"click","element_id":"Continue to Deposit Review","reasoning":"Reach review without posting funds."}
+{"event":"discovery_completed","capability_id":"prepare_deposit","final_url":"http://127.0.0.1:5001/deposit/review","posted":false}
