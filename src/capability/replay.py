@@ -346,7 +346,7 @@ class ReplayEngine:
                     error=str(error)
                 )
 
-                self.surface.page.wait_for_timeout(
+                self.surface.wait(
                     self.retry_delay_ms
                 )
 
@@ -387,6 +387,24 @@ class ReplayEngine:
 
         elif (
             step.action
+            == StepType.SELECT
+        ):
+            value = self._resolve_value(
+                step.value,
+                inputs
+            )
+
+            locator = self._find_target(
+                step.target
+            )
+
+            # Prefer the human-readable option label recorded at discovery.
+            locator.select_option(
+                label=value
+            )
+
+        elif (
+            step.action
             == StepType.CLICK
         ):
             locator = self._find_target(
@@ -407,7 +425,7 @@ class ReplayEngine:
             step.action
             == StepType.WAIT
         ):
-            self.surface.page.wait_for_timeout(
+            self.surface.wait(
                 1000
             )
 
