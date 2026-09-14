@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>New Sub-account</title>
+<html lang="en"><head><meta charset="UTF-8"><title>Create Sub-account</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
-<body><div class="header">LegacyBank Credit Union Console</div>
-<div class="container"><div class="eyebrow">ACCOUNT OPENING · DRAFT</div>
-<h2>New Sub-account for {{ member.name }}</h2>
-<p>Prepare account details. Nothing is opened until final human confirmation.</p>
+<body><header class="header"><div><span class="brand-mark">LB</span> LegacyBank Credit Union</div><a class="header-link" href="/">Operations</a></header>
+<main class="container form-page"><div class="eyebrow">ACCOUNT SERVICES · DRAFT</div>
+<h1>Create Sub-account</h1>
+<p>Enter the details directly. Nothing is opened until final human approval.</p>
 <form action="{{ url_for('review_subaccount') }}" method="post">
-<input type="hidden" name="member_id" value="{{ member_id }}">
+<label for="member_id">Member Number</label>
+<input id="member_id" name="member_id" type="text" value="{{ member_id or '' }}" autocomplete="off" required>
+{% if member %}<small>Selected member: {{ member.name }}</small>{% endif %}
 <label for="account_type">Account Type</label>
 <select id="account_type" name="account_type" required>
 <option value="">Choose an account type</option><option>Holiday Savings</option>
@@ -15,4 +17,4 @@
 <input id="nickname" name="nickname" type="text" placeholder="Optional nickname">
 <button type="submit">Continue to Review</button></form>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
-</div></body></html>
+</main></body></html>
