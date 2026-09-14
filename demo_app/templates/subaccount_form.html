@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>New Sub-account</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><div class="header">LegacyBank Credit Union Console</div>
+<div class="container"><div class="eyebrow">ACCOUNT OPENING · DRAFT</div>
+<h2>New Sub-account for {{ member.name }}</h2>
+<p>Prepare account details. Nothing is opened until final human confirmation.</p>
+<form action="{{ url_for('review_subaccount') }}" method="post">
+<input type="hidden" name="member_id" value="{{ member_id }}">
+<label for="account_type">Account Type</label>
+<select id="account_type" name="account_type" required>
+<option value="">Choose an account type</option><option>Holiday Savings</option>
+<option>Money Market</option><option>Certificate</option></select>
+<label for="nickname">Account Nickname</label>
+<input id="nickname" name="nickname" type="text" placeholder="Optional nickname">
+<button type="submit">Continue to Review</button></form>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+</div></body></html>
