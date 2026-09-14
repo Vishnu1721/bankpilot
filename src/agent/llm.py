@@ -26,10 +26,7 @@ class LLMClient:
             input=self._build_input(goal, observation),
         )
         raw_text = response.output_text.strip()
-        if raw_text.startswith("```"):
-            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-
-        data = json.loads(raw_text)
+        data = self._parse_first_json_object(raw_text)
         if (
             data.get("action") == "finish"
             and data.get("result") is not None
@@ -37,6 +34,26 @@ class LLMClient:
         ):
             data["result"] = {"value": data["result"]}
         return AgentAction.model_validate(data)
+
+    @staticmethod
+    def _parse_first_json_object(raw_text):
+        """Parse one action even if the model appends prose or another object."""
+        cleaned = raw_text.replace("```json", "").replace("```", "").strip()
+        object_start = cleaned.find("{")
+        if object_start == -1:
+            raise ValueError("Model response did not contain a JSON action.")
+
+        try:
+            data, _ = json.JSONDecoder().raw_decode(cleaned[object_start:])
+        except json.JSONDecodeError as error:
+            preview = " ".join(cleaned[:240].split())
+            raise ValueError(
+                f"Model returned invalid action JSON: {preview}"
+            ) from error
+
+        if not isinstance(data, dict):
+            raise ValueError("Model action must be a JSON object.")
+        return data
 
     def _build_input(self, goal: str, observation: Observation):
         system = """You control a business application through a restricted interface.
