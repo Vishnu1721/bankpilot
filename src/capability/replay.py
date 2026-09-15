@@ -23,6 +23,10 @@ from src.safety.policy import (
 )
 
 
+class OutputContractError(RuntimeError):
+    """Raised when replay did not produce every declared capability output."""
+
+
 class ReplayEngine:
 
     def __init__(
@@ -184,8 +188,34 @@ class ReplayEngine:
                         self._perform_handoff(
                             f"Automation was blocked at {step.step_id}: {error}"
                         )
+                        if step.action == StepType.EXTRACT:
+                            try:
+                                self._execute_step_with_retry(
+                                    step,
+                                    capability,
+                                    inputs,
+                                    outputs,
+                                )
+                            except Exception as retry_error:
+                                result = self._failure_result(step, retry_error)
+                                self.logger.log(
+                                    "replay_failed",
+                                    code=result.code,
+                                    failed_step=result.failed_step,
+                                    message=result.message,
+                                    evidence_path=result.evidence_path,
+                                )
+                                return result
                         self.recovered_steps.append(step.step_id)
-                        self.logger.log("step_completed", step_id=step.step_id, completed_by="human")
+                        self.logger.log(
+                            "step_completed",
+                            step_id=step.step_id,
+                            completed_by=(
+                                "automation_after_handoff"
+                                if step.action == StepType.EXTRACT
+                                else "human"
+                            ),
+                        )
                         continue
                     result = self._failure_result(
                         step,
@@ -222,10 +252,23 @@ class ReplayEngine:
                     return business_result
 
             try:
+                self._validate_outputs(
+                    capability,
+                    outputs,
+                )
                 self._check_success(
                     capability
                 )
 
+            except OutputContractError as error:
+                result = self._output_contract_failure_result(error)
+                self.logger.log(
+                    "replay_failed",
+                    code=result.code,
+                    message=result.message,
+                    evidence_path=result.evidence_path,
+                )
+                return result
             except Exception as error:
                 result = (
                     self._final_failure_result(
@@ -590,7 +633,6 @@ class ReplayEngine:
                 "success_condition"
             )
         )
-
         return ReplayResult(
             status=ReplayStatus.FAILURE,
             outputs={},
@@ -607,6 +649,19 @@ class ReplayEngine:
                 self.recovered_steps
             ),
             evidence_path=evidence_path
+        )
+
+    def _output_contract_failure_result(self, error):
+        evidence_path = self._capture_failure_evidence("output_contract")
+        return ReplayResult(
+            status=ReplayStatus.FAILURE,
+            outputs={},
+            code="OUTPUT_CONTRACT_FAILED",
+            message=str(error),
+            expected="Every declared capability output should be extracted.",
+            observed=self._current_page_summary(),
+            recovered_steps=self.recovered_steps,
+            evidence_path=evidence_path,
         )
 
     def _capture_failure_evidence(
@@ -730,6 +785,15 @@ class ReplayEngine:
         unexpected = set(inputs) - declared
         if unexpected:
             raise ValueError(f"Unexpected input(s): {', '.join(sorted(unexpected))}")
+
+    @staticmethod
+    def _validate_outputs(capability, outputs):
+        declared = {output.name for output in capability.outputs}
+        missing = sorted(declared - set(outputs))
+        if missing:
+            raise OutputContractError(
+                f"Missing declared output(s): {', '.join(missing)}"
+            )
 
     @staticmethod
     def _validate_typed_value(name, value, expected_type):
