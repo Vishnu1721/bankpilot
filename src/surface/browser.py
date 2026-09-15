@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urljoin
 
 from playwright.sync_api import sync_playwright
 
@@ -99,6 +100,70 @@ class BrowserSurface:
                 )
             ]
         self.page.screenshot(path=str(output), full_page=True, mask=masks)
+
+    def current_url(self):
+        return self.page.url
+
+    def page_title(self):
+        return self.page.title()
+
+    def body_text(self):
+        return self.page.locator("body").inner_text()
+
+    def find_target(self, target):
+        if target is None:
+            raise ValueError("Replay step has no target.")
+        if target.role and target.name:
+            try:
+                locator = self.page.get_by_role(target.role, name=target.name)
+                if locator.count() == 1:
+                    return locator
+            except Exception:
+                pass
+        if target.selector:
+            locator = self.page.locator(target.selector)
+            if locator.count() == 1:
+                return locator
+        raise RuntimeError(f"Unable to locate target: {target.name}")
+
+    def target_destination(self, target):
+        locator = self.find_target(target)
+        href = locator.get_attribute("href")
+        return urljoin(self.page.url, href) if href else None
+
+    def fill_target(self, target, value):
+        self.find_target(target).fill(value)
+
+    def select_target(self, target, value):
+        self.find_target(target).select_option(label=value)
+
+    def click_target(self, target):
+        self.find_target(target).click()
+        self.page.wait_for_load_state("domcontentloaded")
+
+    def extract_labeled_value(self, label):
+        rows = self.page.locator("tr")
+        for index in range(rows.count()):
+            row = rows.nth(index)
+            if label.lower() in row.inner_text().strip().lower():
+                cells = row.locator("td")
+                if cells.count() >= 2:
+                    return cells.nth(1).inner_text().strip()
+        raise RuntimeError(f"Could not extract value for: {label}")
+
+    def validation_errors(self):
+        messages = []
+        invalid = self.page.locator(":invalid")
+        for index in range(invalid.count()):
+            message = invalid.nth(index).evaluate("el => el.validationMessage")
+            if message:
+                messages.append(message)
+        errors = self.page.locator(".error")
+        for index in range(errors.count()):
+            text = errors.nth(index).inner_text().strip()
+            if text:
+                messages.append(text)
+        return messages
 
     def _get_role(self, control, tag):
         if tag == "input":

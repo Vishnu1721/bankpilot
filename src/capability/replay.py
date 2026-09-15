@@ -27,6 +27,10 @@ class OutputContractError(RuntimeError):
     """Raised when replay did not produce every declared capability output."""
 
 
+class IdentityMismatchError(RuntimeError):
+    """Raised when returned customer data belongs to another member."""
+
+
 class ReplayEngine:
 
     def __init__(
@@ -53,6 +57,7 @@ class ReplayEngine:
         self.current_step_id = None
         self.handoff_manager = handoff_manager
         self.handoff_count = 0
+        self._last_click_navigated = False
 
         self.logger = EventLogger(
             log_path
@@ -106,6 +111,15 @@ class ReplayEngine:
                 inputs
             )
 
+            business_result = self._validate_business_inputs(capability, inputs)
+            if business_result:
+                self.logger.log(
+                    "business_outcome",
+                    code=business_result.code,
+                    message=business_result.message,
+                )
+                return business_result
+
             self.safety.check_url(
                 capability.start_url
             )
@@ -140,7 +154,7 @@ class ReplayEngine:
                 )
 
                 self.safety.check_url(
-                    self.surface.page.url
+                    self.surface.current_url()
                 )
 
                 business_result = (
@@ -183,6 +197,16 @@ class ReplayEngine:
                         step_id=step.step_id
                     )
 
+                except IdentityMismatchError as error:
+                    result = self._identity_failure_result(error)
+                    self.logger.log(
+                        "replay_failed",
+                        code=result.code,
+                        failed_step=step.step_id,
+                        message=result.message,
+                        evidence_path=result.evidence_path,
+                    )
+                    return result
                 except Exception as error:
                     if self.handoff_manager is not None:
                         self._perform_handoff(
@@ -237,7 +261,12 @@ class ReplayEngine:
                     return result
 
                 business_result = (
-                    self._detect_business_outcome()
+                    self._detect_business_outcome(
+                        include_validation=(
+                            step.action == StepType.CLICK
+                            and not self._last_click_navigated
+                        )
+                    )
                 )
 
                 if business_result:
@@ -378,7 +407,7 @@ class ReplayEngine:
 
                 return False
 
-            except SafetyViolation:
+            except (SafetyViolation, IdentityMismatchError):
                 raise
             except Exception as error:
                 last_error = error
@@ -424,7 +453,7 @@ class ReplayEngine:
         self.safety.check_replay_target(
             step.action.value,
             step.target,
-            self.surface.page.url,
+            self.surface.current_url(),
         )
 
         if (
@@ -440,13 +469,7 @@ class ReplayEngine:
                 f"Value: {value}"
             )
 
-            locator = self._find_target(
-                step.target
-            )
-
-            locator.fill(
-                value
-            )
+            self.surface.fill_target(step.target, value)
 
         elif (
             step.action
@@ -457,32 +480,23 @@ class ReplayEngine:
                 inputs
             )
 
-            locator = self._find_target(
-                step.target
-            )
-
-            # Prefer the human-readable option label recorded at discovery.
-            locator.select_option(
-                label=value
-            )
+            self.surface.select_target(step.target, value)
 
         elif (
             step.action
             == StepType.CLICK
         ):
-            locator = self._find_target(
-                step.target
-            )
-
-            locator.click()
-
-            self.surface.page.wait_for_load_state(
-                "domcontentloaded"
-            )
+            before_url = self.surface.current_url()
+            destination = self.surface.target_destination(step.target)
+            if destination:
+                self.safety.check_url(destination)
+            self.surface.click_target(step.target)
+            self._last_click_navigated = self.surface.current_url() != before_url
 
             self.safety.check_url(
-                self.surface.page.url
+                self.surface.current_url()
             )
+
 
         elif (
             step.action
@@ -496,6 +510,7 @@ class ReplayEngine:
             step.action
             == StepType.EXTRACT
         ):
+            self._verify_requested_identity(inputs)
             extracted = self._extract_value(
                 step.value
             )
@@ -529,14 +544,22 @@ class ReplayEngine:
             )
 
     def _detect_business_outcome(
-        self
+        self,
+        include_validation=False,
     ):
         if self.handoff_manager and self.handoff_manager.requires_handoff():
             self._perform_handoff("The application requires manual verification.")
+        validation_errors = self.surface.validation_errors() if include_validation else []
+        if validation_errors:
+            return ReplayResult(
+                status=ReplayStatus.BUSINESS_OUTCOME,
+                outputs={},
+                code="INVALID_INPUT",
+                message="; ".join(validation_errors),
+                recovered_steps=self.recovered_steps,
+            )
         body_text = (
-            self.surface.page
-            .locator("body")
-            .inner_text()
+            self.surface.body_text()
         )
 
         if (
@@ -568,8 +591,8 @@ class ReplayEngine:
         context = {
             "capability_id": self.active_capability_id,
             "step_id": self.current_step_id,
-            "url": self.surface.page.url,
-            "page_title": self.surface.page.title(),
+            "url": self.surface.current_url(),
+            "page_title": self.surface.page_title(),
         }
         self.logger.log("handoff_started", reason=reason, control_owner="human", **context)
         result = self.handoff_manager.handoff(reason=reason, context=context)
@@ -579,7 +602,7 @@ class ReplayEngine:
             control_owner="automation",
             capability_id=self.active_capability_id,
             step_id=self.current_step_id,
-            url=self.surface.page.url,
+            url=self.surface.current_url(),
             screenshot=result["screenshot"],
             human_action=result["human_action"],
         )
@@ -664,6 +687,20 @@ class ReplayEngine:
             evidence_path=evidence_path,
         )
 
+    def _identity_failure_result(self, error):
+        evidence_path = self._capture_failure_evidence("identity_mismatch")
+        return ReplayResult(
+            status=ReplayStatus.FAILURE,
+            outputs={},
+            code="MEMBER_IDENTITY_MISMATCH",
+            message=str(error),
+            failed_step=self.current_step_id,
+            expected="Displayed member number should match the requested member_id.",
+            observed=self._current_page_summary(),
+            recovered_steps=self.recovered_steps,
+            evidence_path=evidence_path,
+        )
+
     def _capture_failure_evidence(
         self,
         name
@@ -716,28 +753,10 @@ class ReplayEngine:
     def _current_page_summary(
         self
     ):
-        if (
-            self.surface.page
-            is None
-        ):
-            return (
-                "No active browser page."
-            )
-
         try:
-            title = (
-                self.surface.page.title()
-            )
-
-            url = (
-                self.surface.page.url
-            )
-
-            body_text = (
-                self.surface.page
-                .locator("body")
-                .inner_text()
-            )
+            title = self.surface.page_title()
+            url = self.surface.current_url()
+            body_text = self.surface.body_text()
 
             body_text = (
                 " ".join(
@@ -785,6 +804,32 @@ class ReplayEngine:
         unexpected = set(inputs) - declared
         if unexpected:
             raise ValueError(f"Unexpected input(s): {', '.join(sorted(unexpected))}")
+
+    def _validate_business_inputs(self, capability, inputs):
+        if capability.capability_id == "prepare_deposit" and "amount" in inputs:
+            try:
+                amount = float(inputs["amount"])
+            except (TypeError, ValueError):
+                amount = -1
+            if amount < 0.01 or amount > 10000:
+                return ReplayResult(
+                    status=ReplayStatus.BUSINESS_OUTCOME,
+                    outputs={},
+                    code="INVALID_AMOUNT",
+                    message="Deposit amount must be between $0.01 and $10,000.",
+                    recovered_steps=self.recovered_steps,
+                )
+        return None
+
+    def _verify_requested_identity(self, inputs):
+        if "member_id" not in inputs:
+            return
+        displayed = self.surface.extract_labeled_value("Member Number")
+        requested = str(inputs["member_id"])
+        if displayed != requested:
+            raise IdentityMismatchError(
+                f"Displayed member number '{displayed}' does not match requested member_id."
+            )
 
     @staticmethod
     def _validate_outputs(capability, outputs):
@@ -845,96 +890,13 @@ class ReplayEngine:
         self,
         target
     ):
-        if target is None:
-            raise ValueError(
-                "Replay step has "
-                "no target."
-            )
-
-        if (
-            target.role
-            and target.name
-        ):
-            try:
-                locator = (
-                    self.surface.page
-                    .get_by_role(
-                        target.role,
-                        name=target.name
-                    )
-                )
-
-                if (
-                    locator.count()
-                    == 1
-                ):
-                    return locator
-
-            except Exception:
-                pass
-
-        if target.selector:
-            locator = (
-                self.surface.page
-                .locator(
-                    target.selector
-                )
-            )
-
-            if (
-                locator.count()
-                == 1
-            ):
-                return locator
-
-        raise RuntimeError(
-            "Unable to locate "
-            f"target: {target.name}"
-        )
+        return self.surface.find_target(target)
 
     def _extract_value(
         self,
         label
     ):
-        rows = (
-            self.surface.page
-            .locator("tr")
-        )
-
-        for index in range(
-            rows.count()
-        ):
-            row = (
-                rows.nth(index)
-            )
-
-            text = (
-                row.inner_text()
-                .strip()
-            )
-
-            if (
-                label.lower()
-                in text.lower()
-            ):
-                cells = (
-                    row.locator("td")
-                )
-
-                if (
-                    cells.count()
-                    >= 2
-                ):
-                    return (
-                        cells.nth(1)
-                        .inner_text()
-                        .strip()
-                    )
-
-        raise RuntimeError(
-            "Could not extract "
-            f"value for: {label}"
-        )
+        return self.surface.extract_labeled_value(label)
 
     def _check_success(
         self,
@@ -947,9 +909,7 @@ class ReplayEngine:
 
         if condition.type.value == "text_present":
             body_text = (
-                self.surface.page
-                .locator("body")
-                .inner_text()
+                self.surface.body_text()
             )
 
             if (
@@ -962,8 +922,8 @@ class ReplayEngine:
                     f"{condition.value}"
                 )
         elif condition.type.value == "title_equals":
-            if self.surface.page.title() != condition.value:
+            if self.surface.page_title() != condition.value:
                 raise RuntimeError(f"Expected page title: {condition.value}")
         elif condition.type.value == "url_matches":
-            if re.fullmatch(condition.value, self.surface.page.url) is None:
+            if re.fullmatch(condition.value, self.surface.current_url()) is None:
                 raise RuntimeError(f"URL did not match: {condition.value}")

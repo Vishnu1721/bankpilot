@@ -101,6 +101,18 @@ def test_handoff_requires_description_and_changed_state():
         def screenshot(self, _path):
             return None
 
+        def current_url(self):
+            return self.page.url
+
+        def page_title(self):
+            return self.page.title()
+
+        def body_text(self):
+            return self.page.locator("body").inner_text()
+
+        def validation_errors(self):
+            return []
+
     manager = HumanHandoffManager(Surface())
     with patch("builtins.input", return_value=""):
         expect_error(RuntimeError, lambda: manager.handoff("Verify member"))
@@ -130,6 +142,18 @@ def test_handoff_cannot_skip_declared_output():
 
         def screenshot(self, _path):
             return None
+
+        def current_url(self):
+            return self.page.url
+
+        def page_title(self):
+            return self.page.title()
+
+        def body_text(self):
+            return self.page.locator("body").inner_text()
+
+        def validation_errors(self):
+            return []
 
     class FailingReplay(ReplayEngine):
         def _execute_step_with_retry(self, *_args, **_kwargs):

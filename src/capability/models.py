@@ -69,10 +69,6 @@ class Capability(BaseModel):
             raise ValueError(f"Unsupported schema_version: {self.schema_version}")
         parameter_names = {item.name for item in self.parameters}
         output_names = {item.name for item in self.outputs}
-        mapped_outputs = {
-            step.output_name for step in self.steps
-            if step.action == StepType.EXTRACT and step.output_name is not None
-        }
         if len(parameter_names) != len(self.parameters) or len(output_names) != len(self.outputs):
             raise ValueError("Parameter and output names must be unique.")
         if len({step.step_id for step in self.steps}) != len(self.steps):
@@ -93,6 +89,12 @@ class Capability(BaseModel):
                 name = step.value[2:-2]
                 if name not in parameter_names:
                     raise ValueError(f"Undeclared parameter placeholder: {name}")
+        # Compute this only after the loop because the single-output
+        # compatibility path above may infer output_name on an extract step.
+        mapped_outputs = {
+            step.output_name for step in self.steps
+            if step.action == StepType.EXTRACT and step.output_name is not None
+        }
         missing_output_steps = output_names - mapped_outputs
         if missing_output_steps:
             raise ValueError(
