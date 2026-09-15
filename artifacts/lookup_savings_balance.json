@@ -2,21 +2,72 @@
   "schema_version": "1.1",
   "capability_id": "lookup_savings_balance",
   "name": "Lookup Savings Balance",
-  "description": "Look up a member and return the current savings balance.",
+  "description": "Find a member and return their current savings balance.",
   "application": "LegacyBank Credit Union",
   "start_url": "http://127.0.0.1:5001/",
   "parameters": [
-    {"name": "member_id", "type": "string", "required": true, "description": "Runtime member number."}
+    {
+      "name": "member_id",
+      "type": "string",
+      "required": true,
+      "description": "Runtime value for member id."
+    }
   ],
   "outputs": [
-    {"name": "savings_balance", "type": "string", "description": "Current savings balance."}
+    {
+      "name": "savings_balance",
+      "type": "string",
+      "description": "Current savings balance."
+    }
   ],
   "steps": [
-    {"step_id": "step_1", "action": "click", "target": {"role": "link", "name": "Balance Lookup", "selector": "a[aria-label=\"Balance Lookup\"]"}, "value": null, "description": "Open Balance Lookup."},
-    {"step_id": "step_2", "action": "type", "target": {"role": "textbox", "name": "Member Number", "selector": "input[name=\"member_id\"]"}, "value": "{{member_id}}", "description": "Enter member number."},
-    {"step_id": "step_3", "action": "select", "target": {"role": "combobox", "name": "Account Type", "selector": "select[name=\"account_type\"]"}, "value": "Savings", "description": "Select Savings."},
-    {"step_id": "step_4", "action": "click", "target": {"role": "button", "name": "View Balance", "selector": "button[aria-label=\"View Balance\"]"}, "value": null, "description": "View the balance."},
-    {"step_id": "step_5", "action": "extract", "target": null, "value": "Current Balance", "output_name": "savings_balance", "description": "Extract the current savings balance."}
+    {
+      "step_id": "step_1",
+      "action": "click",
+      "target": {
+        "role": "link",
+        "name": "Member Lookup",
+        "selector": "a[aria-label=\"Member Lookup\"]"
+      },
+      "value": null,
+      "output_name": null,
+      "description": "Click Member Lookup."
+    },
+    {
+      "step_id": "step_2",
+      "action": "type",
+      "target": {
+        "role": "textbox",
+        "name": "Member Number",
+        "selector": "input[name=\"member_id\"]"
+      },
+      "value": "{{member_id}}",
+      "output_name": null,
+      "description": "Enter value into Member Number."
+    },
+    {
+      "step_id": "step_3",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Search Member",
+        "selector": "button[aria-label=\"Search Member\"]"
+      },
+      "value": null,
+      "output_name": null,
+      "description": "Click Search Member."
+    },
+    {
+      "step_id": "step_4",
+      "action": "extract",
+      "target": null,
+      "value": "Savings Balance",
+      "output_name": "savings_balance",
+      "description": "Extract the current savings balance."
+    }
   ],
-  "success_condition": {"type": "text_present", "value": "Balance Result"}
+  "success_condition": {
+    "type": "text_present",
+    "value": "Member Details"
+  }
 }

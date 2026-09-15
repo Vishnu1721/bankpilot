@@ -1,0 +1,13 @@
+{"timestamp": "2026-09-15T22:11:23.542239+00:00", "event": "discovery_started", "start_url": "http://127.0.0.1:5001/", "parameter_names": ["member_id"], "budget": {"max_steps": 8, "max_llm_calls": 8, "max_elapsed_seconds": 120.0, "max_observation_chars": 8000, "max_same_state": 3}}
+{"timestamp": "2026-09-15T22:11:23.644177+00:00", "event": "observation", "step": 1, "title": "LegacyBank Operations", "url": "http://127.0.0.1:5001/", "trust": "untrusted_ui_data", "fingerprint": "e2bffd76518413741debd528c94a7f1098480c897df7c8599b251821c7f7269e"}
+{"timestamp": "2026-09-15T22:11:27.185143+00:00", "event": "agent_decision", "step": 1, "action": "click", "element_id": "e1", "reasoning": "Open the read-only [REDACTED_NAME] workflow to find member [REDACTED_NUMBER] and view their savings balance."}
+{"timestamp": "2026-09-15T22:11:27.267203+00:00", "event": "action_executed", "step": 1, "action": "click"}
+{"timestamp": "2026-09-15T22:11:27.300234+00:00", "event": "observation", "step": 2, "title": "[REDACTED_NAME]", "url": "http://127.0.0.1:5001/member-search", "trust": "untrusted_ui_data", "fingerprint": "970cdd6886a362c739c0f3f9d42a4ed6e2d0178476ee4e8d6bf9236948686f84"}
+{"timestamp": "2026-09-15T22:11:29.982829+00:00", "event": "agent_decision", "step": 2, "action": "type", "element_id": "e2", "reasoning": "Enter the requested member number in the [REDACTED_NAME] field."}
+{"timestamp": "2026-09-15T22:11:30.000505+00:00", "event": "action_executed", "step": 2, "action": "type"}
+{"timestamp": "2026-09-15T22:11:30.038039+00:00", "event": "observation", "step": 3, "title": "[REDACTED_NAME]", "url": "http://127.0.0.1:5001/member-search", "trust": "untrusted_ui_data", "fingerprint": "ba710464c07484fe08cdc6ef3cb0f9264a387f2e081214361ffcdb0b93e5747a"}
+{"timestamp": "2026-09-15T22:11:32.267323+00:00", "event": "agent_decision", "step": 3, "action": "click", "element_id": "e3", "reasoning": "The member number field already contains [REDACTED_NUMBER], so submit the lookup."}
+{"timestamp": "2026-09-15T22:11:32.340506+00:00", "event": "action_executed", "step": 3, "action": "click"}
+{"timestamp": "2026-09-15T22:11:32.366961+00:00", "event": "observation", "step": 4, "title": "[REDACTED_NAME]", "url": "http://127.0.0.1:5001/member", "trust": "untrusted_ui_data", "fingerprint": "520b347366b8357ef04fab5d8aeb9c48a5445e8869123c85e5d8d37c2486c108"}
+{"timestamp": "2026-09-15T22:11:35.300224+00:00", "event": "agent_decision", "step": 4, "action": "finish", "element_id": null, "reasoning": "Member [REDACTED_NUMBER]'s current savings balance is shown as [REDACTED_AMOUNT]."}
+{"timestamp": "2026-09-15T22:11:35.300882+00:00", "event": "discovery_completed", "status": "success", "capability_id": "lookup_savings_balance", "steps_used": 4, "llm_calls": 4}
