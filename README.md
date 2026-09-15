@@ -97,13 +97,23 @@ python -m tests.test_hardening
 
 Expected output is `3/3 capability router lifecycle tests passed`. The test proves that a known approved request does not call discovery, an unknown address-change request is discovered only once and cannot replay while draft, approval enables later replay with a different member input, and a capability approved for one tenant is unavailable to another tenant.
 
-The initial registry contains the four reviewed demo capabilities. Matching currently uses deterministic normalized intent-token similarity, not another LLM. In a production service, registration and approval would be authenticated API operations backed by a database and immutable audit log.
+The initial registry contains the four reviewed demo capabilities. Matching uses deterministic normalized intent-token similarity over privacy-safe reviewed terms, not raw goals or another LLM. A score below the threshold produces safe re-discovery; a borderline false-positive can select the wrong approved capability, so production should require stronger typed intent constraints and approval evidence before replay. In a production service, registration and approval would be authenticated API operations backed by a database and immutable audit log.
 
 ## Verification
 
-Run checks that do not require an API key:
+Run the complete non-browser regression suite (including `test_capability_model.py`) without an API key:
 
 ```bash
+pytest -q tests
+```
+
+Expected result: `37 passed`. `pytest.ini` deliberately excludes interactive browser/discovery demonstration modules; those remain executable through their documented `python -m ...` commands and are not deprecated tests.
+
+The equivalent individual checks include:
+
+```bash
+python -m tests.test_capability_model
+python -m tests.test_submission_gaps
 python -m tests.test_security_boundaries
 python -m tests.test_mock_subaccount
 python -m tests.test_capability_outputs
