@@ -17,6 +17,12 @@ from src.capability.models import (
 
 class CapabilityRecorder:
 
+    SAFE_LITERAL_OPTIONS = {
+        "Checking",
+        "Savings",
+        "Holiday Savings",
+    }
+
     def __init__(self, parameters=None):
         self.recorded_steps = []
         self.parameters = parameters or {}
@@ -35,7 +41,7 @@ class CapabilityRecorder:
 
         target = self._find_element(action.element_id, observation)
         value = (
-            self._parameterize_value(action.value)
+            self._parameterize_value(action.value, action.action)
             if action.action in {ActionType.TYPE, ActionType.SELECT}
             else None
         )
@@ -178,7 +184,9 @@ class CapabilityRecorder:
             goal_hash = hashlib.sha256(normalized_goal.encode("utf-8")).hexdigest()[:8]
             capability_id = f"discovered_{goal_hash}"
             display_name = "Discovered Workflow"
-            description = goal.strip() or "LLM-discovered workflow."
+            # The trusted goal may still contain customer PII. Never copy raw
+            # goal text into a persisted capability.
+            description = "LLM-discovered workflow pending human review."
             outputs = []
             checkpoint = (
                 final_observation.title
@@ -223,10 +231,15 @@ class CapabilityRecorder:
                 return element
         raise ValueError(f"Element {element_id} was not found.")
 
-    def _parameterize_value(self, value):
+    def _parameterize_value(self, value, action_type):
         if value is None:
             return None
         for parameter_name, parameter_value in self.parameters.items():
             if str(value) == str(parameter_value):
                 return "{{" + parameter_name + "}}"
-        return value
+        if action_type == ActionType.SELECT and value in self.SAFE_LITERAL_OPTIONS:
+            return value
+        raise ValueError(
+            "Refusing to persist an unmatched UI value. Pass it as a named "
+            "runtime parameter before recording the capability."
+        )

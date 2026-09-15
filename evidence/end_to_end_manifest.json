@@ -1,9 +1,12 @@
 {
   "command": "python -m tests.test_end_to_end",
   "artifact": "artifacts/lookup_savings_balance.json",
-  "discovery_log": "evidence/end_to_end_discovery.jsonl",
-  "replay_log": "evidence/end_to_end_replay.jsonl",
-  "replay_screenshot": "evidence/end_to_end_replay.png",
   "transcript": "evidence/end_to_end_transcript.txt",
-  "provenance": "The checked-in transcript is a privacy-redacted copy of the operator-supplied model-driven run. Running the command regenerates the JSONL logs, artifact, and screenshot from the same path."
+  "committed_evidence_complete": false,
+  "runtime_outputs_not_committed": [
+    "evidence/end_to_end_discovery.jsonl",
+    "evidence/end_to_end_replay.jsonl",
+    "evidence/end_to_end_replay.png"
+  ],
+  "provenance": "The transcript is a privacy-redacted copy of the operator-supplied model-driven run. The three runtime outputs are intentionally not represented as committed evidence because this checkout has no model API key with which to reproduce and verify them. Run the command with OPENAI_API_KEY, inspect the outputs, and commit those exact files before submission."
 }

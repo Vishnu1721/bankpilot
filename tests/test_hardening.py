@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from src.agent.models import ActionType, AgentAction, Observation, UIElement
 from src.capability.checkpoint import verify_observation_checkpoint
 from src.capability.models import Capability, SuccessCondition
+from src.capability.recorder import CapabilityRecorder
 from src.capability.replay import ReplayEngine
 from src.observability.logger import EventLogger
 from src.handoff.manager import HumanHandoffManager
@@ -107,10 +108,110 @@ def test_handoff_requires_description_and_changed_state():
         expect_error(RuntimeError, lambda: manager.handoff("Verify member"))
 
 
+def test_handoff_cannot_skip_declared_output():
+    class Locator:
+        def inner_text(self):
+            return "Member Details"
+
+    class Page:
+        url = "http://127.0.0.1:5001/"
+
+        def title(self):
+            return "Member Details"
+
+        def locator(self, _selector):
+            return Locator()
+
+    class Surface:
+        page = Page()
+
+        def navigate(self, url):
+            self.page.url = url
+
+        def screenshot(self, _path):
+            return None
+
+    class FailingReplay(ReplayEngine):
+        def _execute_step_with_retry(self, *_args, **_kwargs):
+            raise RuntimeError("Simulated extraction failure")
+
+        def _perform_handoff(self, _reason):
+            self.handoff_count += 1
+
+    class HandoffManager:
+        def requires_handoff(self):
+            return False
+
+    capability = Capability.model_validate(
+        json.loads(Path("evidence/example_capability.json").read_text())
+    )
+    with TemporaryDirectory() as directory:
+        engine = FailingReplay(
+            Surface(),
+            handoff_manager=HandoffManager(),
+            log_path=Path(directory) / "handoff.jsonl",
+        )
+        result = engine.run(capability, {"member_id": "10024"})
+        assert result.status.value == "failure"
+        assert result.code == "STEP_EXECUTION_FAILED"
+        assert result.failed_step == "step_4"
+
+
+def test_success_requires_every_declared_output():
+    capability = Capability.model_validate(
+        json.loads(Path("evidence/example_capability.json").read_text())
+    )
+    expect_error(
+        RuntimeError,
+        lambda: ReplayEngine._validate_outputs(capability, {}),
+    )
+
+
+def test_artifact_does_not_persist_goal_pii_or_unmatched_values():
+    recorder = CapabilityRecorder()
+    capability = recorder.build_capability(
+        "http://127.0.0.1:5001/",
+        goal="Update Alex Morgan SSN 123-45-6789 and reach review",
+        final_observation=Observation(
+            url="http://127.0.0.1:5001/",
+            title="Workflow Complete",
+            text="Workflow Complete",
+            elements=[],
+        ),
+    )
+    serialized = capability.model_dump_json()
+    assert "Alex Morgan" not in serialized
+    assert "123-45-6789" not in serialized
+
+    observation = Observation(
+        url="http://127.0.0.1:5001/member-search",
+        title="Member Lookup",
+        text="Member Number",
+        elements=[
+            UIElement(
+                element_id="member",
+                role="textbox",
+                name="Member Number",
+                selector="input[name=member_id]",
+            )
+        ],
+    )
+    action = AgentAction(
+        action=ActionType.TYPE,
+        element_id="member",
+        value="123-45-6789",
+        reasoning="Enter supplied value",
+    )
+    expect_error(ValueError, lambda: recorder.record_action(action, observation))
+
+
 if __name__ == "__main__":
     test_route_and_target_policy()
     test_recursive_value_redaction()
     test_schema_and_input_types_are_enforced()
     test_unknown_checkpoint_and_false_finish_are_rejected()
     test_handoff_requires_description_and_changed_state()
-    print("5/5 hardening tests passed")
+    test_handoff_cannot_skip_declared_output()
+    test_success_requires_every_declared_output()
+    test_artifact_does_not_persist_goal_pii_or_unmatched_values()
+    print("8/8 hardening tests passed")

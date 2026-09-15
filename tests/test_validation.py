@@ -153,6 +153,13 @@ def test_capability_schema():
                 description=(
                     "Enter member identifier."
                 )
+            ),
+            CapabilityStep(
+                step_id="step_2",
+                action=StepType.EXTRACT,
+                value="Savings Balance",
+                output_name="savings_balance",
+                description="Extract savings balance."
             )
         ],
 
