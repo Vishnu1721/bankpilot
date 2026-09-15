@@ -1,5 +1,5 @@
 Canonical command: python -m tests.test_end_to_end
-Provenance: privacy-redacted transcript supplied from the operator's model-driven local run.
+Provenance: privacy-redacted transcript of the committed operator model-driven run.
 
 BANKPILOT DISCOVERY
 ===================
@@ -9,34 +9,41 @@ Goal: Look up member [REDACTED_MEMBER] and return their current savings balance.
 --- Step 1 ---
 Page: LegacyBank Operations
 Decision: click
-Reason: Open the read-only Balance Lookup workflow to retrieve the requested member's savings balance.
+Reason: Open the read-only Member Lookup workflow to find the requested member and view their savings balance.
 
 --- Step 2 ---
-Page: Balance Lookup
+Page: Member Lookup
 Decision: type
-Reason: Enter the requested member number.
+Reason: Enter the requested member number in the Member Number field.
 
 --- Step 3 ---
-Page: Balance Lookup
-Decision: select
-Reason: Select the Savings account type.
+Page: Member Lookup
+Decision: click
+Reason: The member number field contains the requested value, so submit the lookup.
 
 --- Step 4 ---
-Page: Balance Lookup
-Decision: click
-Reason: The member number and Savings account type are selected, so view the balance.
-
---- Step 5 ---
-Page: Balance Result
+Page: Member Details
 Decision: finish
-Reason: The requested savings balance is displayed as [REDACTED_AMOUNT].
+Reason: The requested member's current savings balance is displayed as [REDACTED_AMOUNT].
 
 BANKPILOT REPLAY
 ================
 
 Capability: Lookup Savings Balance
-Steps 1-4 completed: click, type, select, click
-Step 5 extracted: [REDACTED_AMOUNT]
+
+--- step_1 ---
+Action: click
+
+--- step_2 ---
+Action: type
+Value: [REDACTED_MEMBER]
+
+--- step_3 ---
+Action: click
+
+--- step_4 ---
+Action: extract
+Extracted: [REDACTED_AMOUNT]
 
 REPLAY COMPLETED
 
