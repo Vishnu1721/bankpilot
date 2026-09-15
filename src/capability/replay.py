@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.capability.models import (
     Capability,
+    DataType,
     StepType
 )
 
@@ -17,7 +18,8 @@ from src.observability.logger import (
 )
 
 from src.safety.policy import (
-    SafetyPolicy
+    SafetyPolicy,
+    SafetyViolation,
 )
 
 
@@ -29,7 +31,8 @@ class ReplayEngine:
         safety_policy=None,
         max_retries=2,
         retry_delay_ms=500,
-        log_path="evidence/replay_log.jsonl"
+        log_path="evidence/replay_log.jsonl",
+        handoff_manager=None,
     ):
         self.surface = surface
 
@@ -44,6 +47,8 @@ class ReplayEngine:
         self.recovered_steps = []
         self.active_capability_id = None
         self.current_step_id = None
+        self.handoff_manager = handoff_manager
+        self.handoff_count = 0
 
         self.logger = EventLogger(
             log_path
@@ -175,6 +180,13 @@ class ReplayEngine:
                     )
 
                 except Exception as error:
+                    if self.handoff_manager is not None:
+                        self._perform_handoff(
+                            f"Automation was blocked at {step.step_id}: {error}"
+                        )
+                        self.recovered_steps.append(step.step_id)
+                        self.logger.log("step_completed", step_id=step.step_id, completed_by="human")
+                        continue
                     result = self._failure_result(
                         step,
                         error
@@ -323,6 +335,8 @@ class ReplayEngine:
 
                 return False
 
+            except SafetyViolation:
+                raise
             except Exception as error:
                 last_error = error
 
@@ -366,7 +380,8 @@ class ReplayEngine:
     ):
         self.safety.check_replay_target(
             step.action.value,
-            step.target
+            step.target,
+            self.surface.page.url,
         )
 
         if (
@@ -442,8 +457,17 @@ class ReplayEngine:
                 step.value
             )
 
-            output_name = (
-                capability.outputs[0].name
+            output_name = step.output_name
+            if output_name is None:
+                raise ValueError(f"Extract step {step.step_id} has no output mapping.")
+
+            output_definition = next(
+                output for output in capability.outputs if output.name == output_name
+            )
+            self._validate_typed_value(
+                output_name,
+                extracted,
+                output_definition.type,
             )
 
             outputs[
@@ -464,6 +488,8 @@ class ReplayEngine:
     def _detect_business_outcome(
         self
     ):
+        if self.handoff_manager and self.handoff_manager.requires_handoff():
+            self._perform_handoff("The application requires manual verification.")
         body_text = (
             self.surface.page
             .locator("body")
@@ -493,6 +519,27 @@ class ReplayEngine:
             )
 
         return None
+
+    def _perform_handoff(self, reason):
+        self.handoff_count += 1
+        context = {
+            "capability_id": self.active_capability_id,
+            "step_id": self.current_step_id,
+            "url": self.surface.page.url,
+            "page_title": self.surface.page.title(),
+        }
+        self.logger.log("handoff_started", reason=reason, control_owner="human", **context)
+        result = self.handoff_manager.handoff(reason=reason, context=context)
+        self.logger.log(
+            "handoff_completed",
+            handoff_number=self.handoff_count,
+            control_owner="automation",
+            capability_id=self.active_capability_id,
+            step_id=self.current_step_id,
+            url=self.surface.page.url,
+            screenshot=result["screenshot"],
+            human_action=result["human_action"],
+        )
 
     def _failure_result(
         self,
@@ -576,10 +623,7 @@ class ReplayEngine:
                 exist_ok=True
             )
 
-            self.surface.page.screenshot(
-                path=str(path),
-                full_page=True
-            )
+            self.surface.screenshot(str(path))
 
             print(
                 f"Failure evidence saved: "
@@ -679,6 +723,24 @@ class ReplayEngine:
                     "Missing required input: "
                     f"{parameter.name}"
                 )
+            if parameter.name in inputs:
+                self._validate_typed_value(parameter.name, inputs[parameter.name], parameter.type)
+
+        declared = {parameter.name for parameter in capability.parameters}
+        unexpected = set(inputs) - declared
+        if unexpected:
+            raise ValueError(f"Unexpected input(s): {', '.join(sorted(unexpected))}")
+
+    @staticmethod
+    def _validate_typed_value(name, value, expected_type):
+        valid = {
+            DataType.STRING: isinstance(value, str),
+            DataType.INTEGER: isinstance(value, int) and not isinstance(value, bool),
+            DataType.NUMBER: isinstance(value, (int, float)) and not isinstance(value, bool),
+            DataType.BOOLEAN: isinstance(value, bool),
+        }[expected_type]
+        if not valid:
+            raise TypeError(f"Value '{name}' must be {expected_type.value}.")
 
     def _resolve_value(
         self,
@@ -819,10 +881,7 @@ class ReplayEngine:
             .success_condition
         )
 
-        if (
-            condition.type
-            == "text_present"
-        ):
+        if condition.type.value == "text_present":
             body_text = (
                 self.surface.page
                 .locator("body")
@@ -838,3 +897,9 @@ class ReplayEngine:
                     "failed. Expected text: "
                     f"{condition.value}"
                 )
+        elif condition.type.value == "title_equals":
+            if self.surface.page.title() != condition.value:
+                raise RuntimeError(f"Expected page title: {condition.value}")
+        elif condition.type.value == "url_matches":
+            if re.fullmatch(condition.value, self.surface.page.url) is None:
+                raise RuntimeError(f"URL did not match: {condition.value}")

@@ -9,6 +9,6 @@
 {"event":"step_recovered","step_id":"step_3"}
 {"event":"step_completed","step_id":"step_3"}
 {"event":"step_started","step_id":"step_4","action":"extract","target":null}
-{"event":"output_extracted","name":"savings_balance","value":"$2150.75"}
+{"event":"output_extracted","name":"savings_balance","value":"[REDACTED_AMOUNT]"}
 {"event":"step_completed","step_id":"step_4"}
-{"event":"replay_completed","status":"success","outputs":{"savings_balance":"$2150.75"},"recovered_steps":["step_3"]}
+{"event":"replay_completed","status":"success","outputs":{"savings_balance":"[REDACTED_AMOUNT]"},"recovered_steps":["step_3"]}

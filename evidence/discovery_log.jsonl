@@ -1,15 +1,15 @@
 {"event":"evidence_metadata","source":"sanitized_from_verified_end_to_end_run","captured_on":"2026-09-14","timestamps_omitted":true}
 {"event":"discovery_started","start_url":"http://127.0.0.1:5001/","parameter_names":["member_id"],"budget":{"max_steps":8,"max_llm_calls":8}}
 {"event":"observation","step":1,"title":"LegacyBank Operations","url":"http://127.0.0.1:5001/","trust":"untrusted_ui_data"}
-{"event":"agent_decision","step":1,"action":"click","element_id":"Balance Lookup","reasoning":"Open the read-only Balance Lookup workflow to retrieve member 10023's savings balance."}
+{"event":"agent_decision","step":1,"action":"click","element_id":"Balance Lookup","reasoning":"Open the read-only Balance Lookup workflow to retrieve member [REDACTED_MEMBER]'s savings balance."}
 {"event":"action_executed","step":1,"action":"click"}
 {"event":"observation","step":2,"title":"Balance Lookup","url":"http://127.0.0.1:5001/balance-lookup","trust":"untrusted_ui_data"}
 {"event":"agent_decision","step":2,"action":"type","element_id":"Member Number","reasoning":"Enter the requested member number."}
 {"event":"action_executed","step":2,"action":"type"}
-{"event":"agent_decision","step":3,"action":"select","element_id":"Account Type","reasoning":"Select the Savings account type for member 10023."}
+{"event":"agent_decision","step":3,"action":"select","element_id":"Account Type","reasoning":"Select the Savings account type for member [REDACTED_MEMBER]."}
 {"event":"action_executed","step":3,"action":"select"}
 {"event":"agent_decision","step":4,"action":"click","element_id":"View Balance","reasoning":"View the selected member's Savings balance."}
 {"event":"action_executed","step":4,"action":"click"}
 {"event":"observation","step":5,"title":"Balance Result","url":"http://127.0.0.1:5001/balance","trust":"untrusted_ui_data"}
-{"event":"agent_decision","step":5,"action":"finish","element_id":null,"reasoning":"The current savings balance for member 10023 is $4,820.35."}
+{"event":"agent_decision","step":5,"action":"finish","element_id":null,"reasoning":"The current savings balance for member [REDACTED_MEMBER] is [REDACTED_AMOUNT]."}
 {"event":"discovery_completed","status":"success","capability_id":"lookup_savings_balance","steps_used":5,"llm_calls":5}

@@ -87,10 +87,18 @@ class BrowserSurface:
     def wait(self, milliseconds=1000):
         self.page.wait_for_timeout(milliseconds)
 
-    def screenshot(self, path):
+    def screenshot(self, path, redact=True):
         output = Path(path)
         output.parent.mkdir(parents=True, exist_ok=True)
-        self.page.screenshot(path=str(output), full_page=True)
+        masks = []
+        if redact:
+            masks = [
+                self.page.locator(
+                    "input, textarea, select, td:nth-child(2), "
+                    ".notice, .error, main p"
+                )
+            ]
+        self.page.screenshot(path=str(output), full_page=True, mask=masks)
 
     def _get_role(self, control, tag):
         if tag == "input":

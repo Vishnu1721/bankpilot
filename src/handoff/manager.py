@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 
 class HumanHandoffManager:
@@ -29,9 +30,10 @@ class HumanHandoffManager:
         context=None,
     ):
         context = context or {}
+        before_state = self._state_fingerprint()
         screenshot_path = Path("evidence/handoff_required.png")
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-        self.surface.page.screenshot(path=str(screenshot_path), full_page=True)
+        self.surface.screenshot(str(screenshot_path))
         url = self.surface.page.url
         print(
             "\n================================"
@@ -65,10 +67,12 @@ class HumanHandoffManager:
 
         human_action = input(
             "\nAfter completing verification, briefly describe what you did "
-            "and press Enter (blank uses the default): "
+            "and press Enter (a blank response cannot resume): "
         ).strip()
         if not human_action:
-            human_action = "Completed required manual member verification."
+            raise RuntimeError("Resume rejected: describe the completed human action.")
+        if self._state_fingerprint() == before_state:
+            raise RuntimeError("Resume rejected: the live session state did not change.")
 
         print(
             "\nHuman intervention completed."
@@ -85,3 +89,8 @@ class HumanHandoffManager:
             "url": url,
             "screenshot": str(screenshot_path),
         }
+
+    def _state_fingerprint(self):
+        page = self.surface.page
+        payload = f"{page.url}\n{page.title()}\n{page.locator('body').inner_text()}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()

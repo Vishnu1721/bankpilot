@@ -10,7 +10,7 @@ from src.capability.models import (
 
 
 capability = Capability(
-    schema_version="1.0",
+    schema_version="1.1",
     capability_id="lookup_savings_balance",
     name="Lookup Savings Balance",
     description=(

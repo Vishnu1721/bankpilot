@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +13,11 @@ class EventLogger:
         "api_key",
         "member_id",
         "account_number",
-        "ssn"
+        "ssn",
+        "outputs",
+        "value",
+        "human_action",
+        "observed",
     }
 
     def __init__(
@@ -85,5 +90,19 @@ class EventLogger:
                 self._redact(item)
                 for item in value
             ]
+
+        if isinstance(value, tuple):
+            return [self._redact(item) for item in value]
+
+        if isinstance(value, str):
+            patterns = (
+                (r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED_SSN]"),
+                (r"\$\s?\d[\d,]*(?:\.\d{2})?", "[REDACTED_AMOUNT]"),
+                (r"\b\d{5,19}\b", "[REDACTED_NUMBER]"),
+                (r"\b[A-Z][a-z]+\s+[A-Z][a-z]+\b", "[REDACTED_NAME]"),
+            )
+            for pattern, replacement in patterns:
+                value = re.sub(pattern, replacement, value)
+            return value
 
         return value

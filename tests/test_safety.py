@@ -50,14 +50,14 @@ print(
 print("------------------")
 
 observation = Observation(
-    url="http://127.0.0.1:5001",
+    url="http://127.0.0.1:5001/member-search",
     title="LegacyBank Admin",
     text="Member Search",
     elements=[
         UIElement(
             element_id="e1",
             role="button",
-            name="Search",
+            name="Search Member",
             selector=(
                 'button[type="submit"]'
             )

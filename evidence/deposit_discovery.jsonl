@@ -1,6 +1,6 @@
 {"event":"evidence_metadata","source":"sanitized_from_verified_live_demo","captured_on":"2026-09-14","note":"Mock member data; timestamps omitted"}
 {"event":"agent_decision","step":1,"action":"click","element_id":"Deposit","reasoning":"Open the deposit workflow."}
-{"event":"agent_decision","step":2,"action":"type","element_id":"Member Number","reasoning":"Enter member 10024."}
+{"event":"agent_decision","step":2,"action":"type","element_id":"Member Number","reasoning":"Enter member [REDACTED_MEMBER]."}
 {"event":"agent_decision","step":3,"action":"select","element_id":"Destination Account","reasoning":"Select Savings."}
 {"event":"agent_decision","step":4,"action":"type","element_id":"Deposit Amount","reasoning":"Enter 200."}
 {"event":"agent_decision","step":5,"action":"type","element_id":"Memo","reasoning":"Enter Cash deposit."}

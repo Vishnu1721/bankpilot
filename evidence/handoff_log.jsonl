@@ -9,6 +9,6 @@
 {"event":"handoff_started","control_owner":"human","capability_id":"lookup_savings_balance","step_id":"step_3","url":"http://127.0.0.1:5001/member","page_title":"Manual Verification","reason":"LegacyBank requires manual member verification.","screenshot":"evidence/handoff_required.png"}
 {"event":"handoff_completed","handoff_number":1,"control_owner":"automation","capability_id":"lookup_savings_balance","step_id":"step_3","url":"http://127.0.0.1:5001/member","human_action":"Completed required manual member verification.","screenshot":"evidence/handoff_required.png"}
 {"event":"step_started","step_id":"step_4","action":"extract","target":null}
-{"event":"output_extracted","name":"savings_balance","value":"$3675.20"}
+{"event":"output_extracted","name":"savings_balance","value":"[REDACTED_AMOUNT]"}
 {"event":"step_completed","step_id":"step_4"}
-{"event":"replay_completed","status":"success","outputs":{"savings_balance":"$3675.20"},"recovered_steps":[],"handoff_count":1}
+{"event":"replay_completed","status":"success","outputs":{"savings_balance":"[REDACTED_AMOUNT]"},"recovered_steps":[],"handoff_count":1}
