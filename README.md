@@ -53,7 +53,7 @@ python -m tests.test_replay
 
 Both interactive scripts pause before closing so you can inspect the UI; press Enter to continue. Discovery creates `artifacts/lookup_savings_balance.json`; replay reads that file with member `10024` and writes `evidence/replay_success.jsonl` plus `evidence/replay_final.png`.
 
-The generated canonical artifact is committed. `evidence/end_to_end_transcript.txt` is the privacy-redacted transcript supplied from the operator's model-driven run. The manifest explicitly marks the discovery JSONL, replay JSONL, and screenshot as runtime outputs that are not yet committed. The repository contains no API credential, so those files must be regenerated with your `OPENAI_API_KEY`, inspected, and committed before submission; they are not represented as independently verified evidence.
+The complete canonical evidence set is committed: `artifacts/lookup_savings_balance.json`, `evidence/end_to_end_discovery.jsonl`, `evidence/end_to_end_replay.jsonl`, `evidence/end_to_end_replay.png`, and the privacy-redacted `evidence/end_to_end_transcript.txt`. The discovery run chose the valid Member Lookup route, and replay used that exact generated artifact with a different member input. `evidence/end_to_end_manifest.json` records the paths and provenance. Rerunning model-driven discovery still requires your own `OPENAI_API_KEY`; deterministic replay and the committed evidence remain inspectable without it.
 
 ## Independent operations
 
