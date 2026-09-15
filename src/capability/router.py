@@ -81,7 +81,7 @@ class CapabilityRouter:
             artifact_path=str(Path(artifact_path)),
             tenant_id=tenant_id,
             application=application,
-            intents=[goal],
+            intents=[self.registry.sanitize_intent(goal)],
         ))
         return RouteResult(
             mode=RouteMode.DRAFT_CREATED,

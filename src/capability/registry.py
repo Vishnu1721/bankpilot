@@ -31,6 +31,9 @@ class CapabilityRegistry:
         self.entries = self._load()
 
     def register(self, entry):
+        entry = entry.model_copy(update={
+            "intents": [self.sanitize_intent(intent) for intent in entry.intents]
+        })
         replacement = entry.model_copy(update={"status": CapabilityStatus.DRAFT})
         self.entries = [
             current for current in self.entries
@@ -118,3 +121,15 @@ class CapabilityRegistry:
             if token not in ignored
         }
 
+    @classmethod
+    def sanitize_intent(cls, text):
+        """Persist matching terms, never a raw user goal or runtime identity."""
+        safe_terms = {
+            "account", "address", "balance", "change", "checking", "create",
+            "deposit", "details", "find", "lookup", "member", "memo", "new",
+            "open", "prepare", "profile", "review", "savings", "subaccount",
+            "update", "verify", "withdrawal",
+        }
+        tokens = re.findall(r"[a-z]+", text.lower().replace("sub-account", "subaccount"))
+        sanitized = " ".join(token for token in tokens if token in safe_terms)
+        return sanitized or "reviewed workflow"

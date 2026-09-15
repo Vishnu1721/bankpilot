@@ -149,9 +149,28 @@ class DiscoveryAgent:
                     action=action.action.value,
                 )
 
-            raise DiscoveryBudgetExceeded(
+            error = DiscoveryBudgetExceeded(
                 f"Discovery budget exceeded: max_steps ({budget.max_steps})."
             )
+            if self.handoff_manager is not None:
+                self._handoff(str(error), budget.max_steps)
+                self.logger.log(
+                    "discovery_escalated",
+                    reason=str(error),
+                    control_owner="automation",
+                )
+                return {"status": "human_intervention_completed", "reason": str(error)}
+            raise error
+        except DiscoveryBudgetExceeded as error:
+            if self.handoff_manager is not None:
+                self._handoff(str(error), budget.max_steps)
+                return {"status": "human_intervention_completed", "reason": str(error)}
+            self.logger.log(
+                "discovery_failed",
+                reason=type(error).__name__,
+                message=str(error),
+            )
+            raise
         except Exception as error:
             self.logger.log(
                 "discovery_failed",

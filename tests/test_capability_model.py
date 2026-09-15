@@ -9,7 +9,8 @@ from src.capability.models import (
 )
 
 
-capability = Capability(
+def build_capability():
+    return Capability(
     schema_version="1.1",
     capability_id="lookup_savings_balance",
     name="Lookup Savings Balance",
@@ -72,11 +73,20 @@ capability = Capability(
         type="text_present",
         value="Member Details"
     )
-)
-
-
-print(
-    capability.model_dump_json(
-        indent=2
     )
-)
+
+
+def test_single_output_mapping_inference():
+    capability = build_capability()
+    extract = next(step for step in capability.steps if step.action == StepType.EXTRACT)
+    assert extract.output_name == "savings_balance"
+
+
+if __name__ == "__main__":
+    capability = build_capability()
+    test_single_output_mapping_inference()
+    print(
+        capability.model_dump_json(
+            indent=2
+        )
+    )

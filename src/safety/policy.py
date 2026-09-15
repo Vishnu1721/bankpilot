@@ -32,14 +32,18 @@ DEFAULT_ROUTE_POLICIES = (
 
 
 class SafetyPolicy:
-    def __init__(self, allowed_hosts=None, route_policies=None):
-        self.allowed_hosts = set(allowed_hosts or {"127.0.0.1", "localhost"})
+    def __init__(self, allowed_origins=None, route_policies=None):
+        self.allowed_origins = set(allowed_origins or {
+            "http://127.0.0.1:5001",
+            "http://localhost:5001",
+        })
         self.route_policies = tuple(route_policies or DEFAULT_ROUTE_POLICIES)
 
     def check_url(self, url):
         parsed = urlparse(url)
-        if parsed.hostname not in self.allowed_hosts:
-            raise SafetyViolation(f"Navigation blocked. Host '{parsed.hostname}' is not allowed.")
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if origin not in self.allowed_origins:
+            raise SafetyViolation(f"Navigation blocked. Origin '{origin}' is not allowed.")
         path = parsed.path or "/"
         if self._route_for(path) is None:
             raise SafetyViolation(f"Navigation blocked. Route '{path}' is not allowed.")
