@@ -76,7 +76,8 @@ class CapabilityRecorder:
             ]
             steps.append(CapabilityStep(
                 step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
-                target=None, value="Amount",
+                    target=None, value="Amount",
+                    output_name="amount",
                 description="Extract the reviewed deposit amount.",
             ))
             success = SuccessCondition(type="text_present", value="Deposit Review")
@@ -95,6 +96,7 @@ class CapabilityRecorder:
             steps.append(CapabilityStep(
                 step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
                 target=None, value="Account Type",
+                output_name="account_type",
                 description="Extract the reviewed sub-account type.",
             ))
             success = SuccessCondition(type="text_present", value="Review New Sub-account")
@@ -113,6 +115,7 @@ class CapabilityRecorder:
             steps.append(CapabilityStep(
                 step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
                 target=None, value="Current Balance",
+                output_name="current_balance",
                 description="Extract the selected account balance.",
             ))
             success = SuccessCondition(type="text_present", value="Balance Result")
@@ -131,6 +134,7 @@ class CapabilityRecorder:
             steps.append(CapabilityStep(
                 step_id=f"step_{len(steps) + 1}", action=StepType.EXTRACT,
                 target=None, value="Member Name",
+                output_name="member_name",
                 description="Extract the member name.",
             ))
             success = SuccessCondition(type="text_present", value="Member Details")
@@ -160,6 +164,7 @@ class CapabilityRecorder:
                     action=StepType.EXTRACT,
                     target=None,
                     value=extraction_label,
+                    output_name="savings_balance",
                     description="Extract the current savings balance.",
                 )
             )
@@ -180,7 +185,7 @@ class CapabilityRecorder:
                 if final_observation and final_observation.title
                 else "Workflow Complete"
             )
-            success = SuccessCondition(type="text_present", value=checkpoint)
+            success = SuccessCondition(type="title_equals", value=checkpoint)
 
         parameter_definitions = [
             ParameterDefinition(

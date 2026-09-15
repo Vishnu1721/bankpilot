@@ -2,9 +2,10 @@ from src.agent.budget import DiscoveryBudget, DiscoveryBudgetExceeded
 from src.agent.llm import LLMClient
 from src.agent.models import ActionType
 from src.capability.recorder import CapabilityRecorder
+from src.capability.checkpoint import verify_observation_checkpoint
 from src.observability.logger import EventLogger
 from src.safety.observation import UntrustedObservationGuard
-from src.safety.policy import SafetyPolicy
+from src.safety.policy import SafetyPolicy, SafetyViolation
 
 
 class DiscoveryAgent:
@@ -18,6 +19,7 @@ class DiscoveryAgent:
         budget=None,
         observation_guard=None,
         llm=None,
+        handoff_manager=None,
     ):
         self.surface = surface
         self.budget_config = budget or DiscoveryBudget(max_steps=max_steps)
@@ -28,6 +30,7 @@ class DiscoveryAgent:
             max_text_chars=self.budget_config.max_observation_chars
         )
         self.logger = EventLogger(log_path)
+        self.handoff_manager = handoff_manager
 
     def run(self, goal, artifact_path=None, parameters=None):
         print("\nBANKPILOT DISCOVERY")
@@ -91,7 +94,16 @@ class DiscoveryAgent:
                     element_id=action.element_id,
                     reasoning=action.reasoning,
                 )
-                self.safety.check_action(action, observation)
+                try:
+                    self.safety.check_action(action, observation)
+                except SafetyViolation as error:
+                    if self.handoff_manager is None:
+                        raise
+                    self._handoff(
+                        f"Discovery action was blocked at step {step_number}: {error}",
+                        step_number,
+                    )
+                    continue
 
                 if action.action == ActionType.FINISH:
                     capability = self.recorder.build_capability(
@@ -99,6 +111,10 @@ class DiscoveryAgent:
                         goal=goal,
                         result=action.result,
                         final_observation=observation,
+                    )
+                    verify_observation_checkpoint(
+                        capability.success_condition,
+                        observation,
                     )
                     if artifact_path:
                         self.recorder.save(capability, artifact_path)
@@ -113,7 +129,10 @@ class DiscoveryAgent:
 
                 if action.action == ActionType.ESCALATE:
                     self.logger.log("discovery_escalated", reason=action.reasoning)
-                    return {"status": "escalated", "reason": action.reasoning}
+                    if self.handoff_manager is None:
+                        return {"status": "escalated", "reason": action.reasoning}
+                    self._handoff(action.reasoning, step_number)
+                    continue
 
                 if action.action == ActionType.WAIT:
                     self.surface.wait(1000)
@@ -140,3 +159,21 @@ class DiscoveryAgent:
                 message=str(error),
             )
             raise
+
+    def _handoff(self, reason, step_number):
+        context = {
+            "capability_id": "discovery",
+            "step_id": f"discovery_step_{step_number}",
+            "url": self.surface.page.url,
+            "page_title": self.surface.page.title(),
+        }
+        self.logger.log("handoff_started", reason=reason, control_owner="human", **context)
+        result = self.handoff_manager.handoff(reason=reason, context=context)
+        self.logger.log(
+            "handoff_completed",
+            control_owner="automation",
+            human_action=result["human_action"],
+            screenshot=result["screenshot"],
+            url=self.surface.page.url,
+            step_id=context["step_id"],
+        )

@@ -37,7 +37,7 @@ def test_parameterization():
     )
 
     observation = Observation(
-        url="http://127.0.0.1:5001",
+        url="http://127.0.0.1:5001/member-search",
         title="LegacyBank Admin",
         text="Member Search",
         elements=[
@@ -115,7 +115,7 @@ def test_parameterization_is_not_hardcoded():
 
 def test_capability_schema():
     capability = Capability(
-        schema_version="1.0",
+        schema_version="1.1",
         capability_id="test_capability",
         name="Test Capability",
         description="Validation capability.",
@@ -166,7 +166,7 @@ def test_capability_schema():
 
     assert (
         capability.schema_version
-        == "1.0"
+        == "1.1"
     )
 
     assert (
@@ -208,14 +208,14 @@ def test_safe_action():
     policy = SafetyPolicy()
 
     observation = Observation(
-        url="http://127.0.0.1:5001",
+        url="http://127.0.0.1:5001/member-search",
         title="LegacyBank Admin",
         text="Member Search",
         elements=[
             UIElement(
                 element_id="e1",
                 role="button",
-                name="Search",
+                name="Search Member",
                 selector="button",
                 value=None
             )

@@ -23,6 +23,7 @@ artifacts/*.json
 !artifacts/lookup_balance.json
 !artifacts/prepare_new_subaccount.json
 !artifacts/prepare_deposit.json
+!artifacts/lookup_savings_balance.json
 
 # Temporary runtime files
 tmp/
