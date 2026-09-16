@@ -26,12 +26,12 @@
       "action": "click",
       "target": {
         "role": "link",
-        "name": "Member Lookup",
-        "selector": "a[aria-label=\"Member Lookup\"]"
+        "name": "Balance Lookup",
+        "selector": "a[aria-label=\"Balance Lookup\"]"
       },
       "value": null,
       "output_name": null,
-      "description": "Click Member Lookup."
+      "description": "Click Balance Lookup."
     },
     {
       "step_id": "step_2",
@@ -47,27 +47,39 @@
     },
     {
       "step_id": "step_3",
-      "action": "click",
+      "action": "select",
       "target": {
-        "role": "button",
-        "name": "Search Member",
-        "selector": "button[aria-label=\"Search Member\"]"
+        "role": "select",
+        "name": "Account Type",
+        "selector": "select[name=\"account_type\"]"
       },
-      "value": null,
+      "value": "Savings",
       "output_name": null,
-      "description": "Click Search Member."
+      "description": "Select a value for Account Type."
     },
     {
       "step_id": "step_4",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "View Balance",
+        "selector": "button[aria-label=\"View Balance\"]"
+      },
+      "value": null,
+      "output_name": null,
+      "description": "Click View Balance."
+    },
+    {
+      "step_id": "step_5",
       "action": "extract",
       "target": null,
-      "value": "Savings Balance",
+      "value": "Current Balance",
       "output_name": "savings_balance",
       "description": "Extract the current savings balance."
     }
   ],
   "success_condition": {
     "type": "text_present",
-    "value": "Member Details"
+    "value": "Balance Result"
   }
 }
