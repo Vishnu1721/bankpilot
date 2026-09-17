@@ -1,13 +1,13 @@
-{"timestamp": "2026-09-16T06:14:06.125208+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "[REDACTED_NAME] Balance"}
-{"timestamp": "2026-09-16T06:14:06.165772+00:00", "event": "step_started", "step_id": "step_1", "action": "click", "target": "[REDACTED_NAME]"}
-{"timestamp": "2026-09-16T06:14:06.294852+00:00", "event": "step_completed", "step_id": "step_1"}
-{"timestamp": "2026-09-16T06:14:06.306123+00:00", "event": "step_started", "step_id": "step_2", "action": "type", "target": "[REDACTED_NAME]"}
-{"timestamp": "2026-09-16T06:14:06.315984+00:00", "event": "step_completed", "step_id": "step_2"}
-{"timestamp": "2026-09-16T06:14:06.317255+00:00", "event": "step_started", "step_id": "step_3", "action": "select", "target": "[REDACTED_NAME]"}
-{"timestamp": "2026-09-16T06:14:06.321660+00:00", "event": "step_completed", "step_id": "step_3"}
-{"timestamp": "2026-09-16T06:14:06.323049+00:00", "event": "step_started", "step_id": "step_4", "action": "click", "target": "[REDACTED_NAME]"}
-{"timestamp": "2026-09-16T06:14:06.415170+00:00", "event": "step_completed", "step_id": "step_4"}
-{"timestamp": "2026-09-16T06:14:06.422729+00:00", "event": "step_started", "step_id": "step_5", "action": "extract", "target": null}
-{"timestamp": "2026-09-16T06:14:06.430575+00:00", "event": "output_extracted", "name": "savings_balance", "value": "[REDACTED]"}
-{"timestamp": "2026-09-16T06:14:06.430740+00:00", "event": "step_completed", "step_id": "step_5"}
-{"timestamp": "2026-09-16T06:14:06.432003+00:00", "event": "replay_completed", "status": "success", "outputs": "[REDACTED]", "recovered_steps": []}
+{"timestamp": "2026-09-17T23:23:17.710558+00:00", "event": "replay_started", "capability_id": "lookup_savings_balance", "capability_name": "[REDACTED_NAME] Balance"}
+{"timestamp": "2026-09-17T23:23:17.754640+00:00", "event": "step_started", "step_id": "step_1", "action": "click", "target": "[REDACTED_NAME]"}
+{"timestamp": "2026-09-17T23:23:17.879127+00:00", "event": "step_completed", "step_id": "step_1"}
+{"timestamp": "2026-09-17T23:23:17.881221+00:00", "event": "step_started", "step_id": "step_2", "action": "type", "target": "[REDACTED_NAME]"}
+{"timestamp": "2026-09-17T23:23:17.890246+00:00", "event": "step_completed", "step_id": "step_2"}
+{"timestamp": "2026-09-17T23:23:17.891273+00:00", "event": "step_started", "step_id": "step_3", "action": "select", "target": "[REDACTED_NAME]"}
+{"timestamp": "2026-09-17T23:23:17.900210+00:00", "event": "step_completed", "step_id": "step_3"}
+{"timestamp": "2026-09-17T23:23:17.902312+00:00", "event": "step_started", "step_id": "step_4", "action": "click", "target": "[REDACTED_NAME]"}
+{"timestamp": "2026-09-17T23:23:18.001843+00:00", "event": "step_completed", "step_id": "step_4"}
+{"timestamp": "2026-09-17T23:23:18.002812+00:00", "event": "step_started", "step_id": "step_5", "action": "extract", "target": null}
+{"timestamp": "2026-09-17T23:23:18.010837+00:00", "event": "output_extracted", "name": "savings_balance", "value": "[REDACTED]"}
+{"timestamp": "2026-09-17T23:23:18.011458+00:00", "event": "step_completed", "step_id": "step_5"}
+{"timestamp": "2026-09-17T23:23:18.012520+00:00", "event": "replay_completed", "status": "success", "outputs": "[REDACTED]", "recovered_steps": []}

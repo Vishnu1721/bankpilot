@@ -1,60 +1,28 @@
-Canonical command: python -m tests.test_end_to_end
-Provenance: privacy-redacted transcript of the committed operator model-driven run.
+Generated from the discovery and replay JSONL; sensitive values are redacted.
+This is an event transcript, not a raw provider response or terminal capture.
 
-BANKPILOT DISCOVERY
-===================
+DISCOVERY
+Step 1: http://127.0.0.1:5001/ | LegacyBank Operations
+Decision: click | Reason: Open the read-only [REDACTED_NAME] workflow to retrieve member [REDACTED_NUMBER]'s savings balance.
+Executed: click
+Step 2: http://127.0.0.1:5001/balance-lookup | [REDACTED_NAME]
+Decision: type | Reason: Enter the requested member number.
+Executed: type
+Step 3: http://127.0.0.1:5001/balance-lookup | [REDACTED_NAME]
+Decision: select | Reason: Select the Savings account type for member [REDACTED_NUMBER].
+Executed: select
+Step 4: http://127.0.0.1:5001/balance-lookup | [REDACTED_NAME]
+Decision: click | Reason: The member number is [REDACTED_NUMBER] and account type is already set to Savings; click [REDACTED_NAME] to retrieve the current balance.
+Executed: click
+Step 5: http://127.0.0.1:5001/balance | [REDACTED_NAME]
+Decision: finish | Reason: [REDACTED_NAME] Result page shows member [REDACTED_NUMBER], [REDACTED_NAME], with a current savings balance of [REDACTED_AMOUNT].
+discovery_completed: success
 
-Goal: Look up member [REDACTED_MEMBER] and return their current savings balance.
-
---- Step 1 ---
-Page: LegacyBank Operations
-Decision: click
-Reason: Use the read-only Balance Lookup workflow to retrieve the requested member's savings balance.
-
---- Step 2 ---
-Page: Balance Lookup
-Decision: type
-Reason: Enter the requested member number in the Member Number field.
-
---- Step 3 ---
-Page: Balance Lookup
-Decision: select
-Reason: Select the Savings account type for the requested member.
-
---- Step 4 ---
-Page: Balance Lookup
-Decision: click
-Reason: The member number and Savings account type are selected, so view the balance.
-
---- Step 5 ---
-Page: Balance Result
-Decision: finish
-Reason: The requested member's current savings balance is displayed as [REDACTED_AMOUNT].
-
-BANKPILOT REPLAY
-================
-
-Capability: Lookup Savings Balance
-
---- step_1 ---
-Action: click
-
---- step_2 ---
-Action: type
-Value: [REDACTED_MEMBER]
-
---- step_3 ---
-Action: select
-
---- step_4 ---
-Action: click
-
---- step_5 ---
-Action: extract
-Extracted: [REDACTED_AMOUNT]
-
-REPLAY COMPLETED
-
-END-TO-END PASS
-Artifact: artifacts/lookup_savings_balance.json
-Replay outputs: {'savings_balance': '[REDACTED_AMOUNT]'}
+REPLAY
+step_1: click
+step_2: type
+step_3: select
+step_4: click
+step_5: extract
+Output: savings_balance = [REDACTED]
+replay_completed: success
