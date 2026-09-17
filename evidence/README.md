@@ -1,41 +1,65 @@
-# Evidence index
+# Evidence
 
-This directory separates the committed model-driven recording from deterministic test fixtures and historical demonstrations. The current implementation and fresh CI checks are described in the [main README](../README.md). Running a demo can overwrite tracked evidence locally; review changes before committing.
+## Final submission status
 
-## Canonical discovery and replay
+**Model recording refresh is still pending.** The committed [manifest](end_to_end_manifest.json) attributes the existing run to source `a95e6580ada2991a5bf5ceb7ab00d11aaff40cc4`. Keep that attribution until a real discovery run replaces these files. The recording is inspectable, but it does not demonstrate all later code changes.
 
-The [manifest](end_to_end_manifest.json) identifies source commit `a95e6580ada2991a5bf5ceb7ab00d11aaff40cc4` and evidence commit `f7ce538cc2409f56f2564bfc168fac92f781de71`. This recording predates the latest hardening; its source attribution has not been changed to imply a fresh run.
+**Main CI is verified.** [Run 35283225107](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107) tested main commit `02724287c0031ba174fed14c4688a90b3e244975`: 68 tests and six Chromium scenarios passed. Its [downloadable evidence](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107/artifacts/10523645846) contains redacted replay logs and a masked failure screenshot. CI does not run model discovery or a human operator.
 
-| File | What it proves |
+## Canonical model recording
+
+These files belong to one discovery-to-replay thread. The currently committed route is Balance Lookup; a fresh run may choose Member Lookup.
+
+| File | Contents |
 | --- | --- |
-| [lookup_savings_balance.json](../artifacts/lookup_savings_balance.json) | The saved schema-1.1 workflow from the canonical run, with a runtime member parameter and named balance extraction. |
-| [end_to_end_discovery.jsonl](end_to_end_discovery.jsonl) | Five model decisions, observations, actions and reasons: Balance Lookup → member entry → Savings selection → View Balance → finish. Sensitive text is redacted. |
-| [end_to_end_replay.jsonl](end_to_end_replay.jsonl) | Deterministic replay of that generated artifact with a different input, ending in success. |
-| [end_to_end_replay.png](end_to_end_replay.png) | Balance Result page with customer values masked. |
-| [end_to_end_transcript.txt](end_to_end_transcript.txt) | Privacy-edited transcript of the same Balance Lookup route; not a raw model transcript or independent second run. |
-| [example_capability.json](example_capability.json) | A separate committed Member Lookup fixture used by repeatable exception/handoff tests. It is not the canonical Balance Lookup artifact. |
+| [lookup_savings_balance.json](../artifacts/lookup_savings_balance.json) | Saved schema-1.1 capability with runtime member input and named balance extraction. |
+| [end_to_end_discovery.jsonl](end_to_end_discovery.jsonl) | Observations, five model decisions, reasons and executed actions from the recorded run. |
+| [end_to_end_replay.jsonl](end_to_end_replay.jsonl) | Successful deterministic replay of that artifact for a different member. |
+| [end_to_end_replay.png](end_to_end_replay.png) | Result page with customer values masked. |
+| [end_to_end_transcript.txt](end_to_end_transcript.txt) | Privacy-edited transcript of the same route. Future refreshes generate it directly from the redacted JSONL. |
+| [end_to_end_manifest.json](end_to_end_manifest.json) | Producing source SHA and run modes. The updated recorder also adds the model, capture time and file hashes. |
 
-Use `python -m tests.test_end_to_end` with the portal running and your API key to regenerate discovery, artifact, replay, screenshot and manifest. The script records the source SHA and whether the worktree was clean at the start. It does not regenerate the transcript or commit files. Review the output, update the redacted transcript to match the actual route, and commit the complete set together; a completeness flag alone is not proof of Git tracking. A model key is not needed to inspect this evidence or replay either artifact.
+### Refresh from the final code
 
-## Exceptional and historical runs
+Merge code changes first. Use a clean checkout with your local `.env` containing `OPENAI_API_KEY`; do not paste the key into a transcript or commit it. Keep `python demo_app/app.py` running in another terminal.
 
-| File | Provenance and limits |
+```bash
+git switch main
+git pull --ff-only origin main
+git status --short
+# Proceed when the status above is empty.
+git switch -c evidence/final-model-run
+python -m tests.test_end_to_end
+```
+
+Use a new branch name if `evidence/final-model-run` already exists. Add `--headless` for a run without browser windows. The command requires a clean source checkout, stages discovery and replay, verifies success, then writes the complete set. It preserves existing canonical files if credentials are missing or execution fails. The transcript is generated from this run's already-redacted events; it cannot silently describe a different route. The manifest records hashes instead of claiming uncommitted files have been published.
+
+Review the JSON, logs, transcript and masked screenshot, then commit the set:
+
+```bash
+git diff -- artifacts/lookup_savings_balance.json evidence/
+git add artifacts/lookup_savings_balance.json \
+  evidence/end_to_end_discovery.jsonl evidence/end_to_end_replay.jsonl \
+  evidence/end_to_end_replay.png evidence/end_to_end_transcript.txt \
+  evidence/end_to_end_manifest.json
+git commit -m "Record discovery and replay from final implementation"
+git push -u origin evidence/final-model-run
+```
+
+Update the status paragraph above with the new source SHA and remove the pending-refresh note in README/REPORT only after inspecting the actual run. Open and merge the evidence PR, then check that the latest [main Actions run](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml?query=branch%3Amain) is green. An evidence commit naturally follows the source commit that produced it; do not substitute the later commit SHA for the recorded source.
+
+## Supplementary and historical runs
+
+These are separate from the canonical model recording:
+
+| File | Status |
 | --- | --- |
-| [replay_business_outcome.jsonl](replay_business_outcome.jsonl) | Sanitized reconstruction of the verified terminal run returning `business_outcome` / `MEMBER_NOT_FOUND`; its metadata explicitly marks that source. |
-| [business_outcome.png](business_outcome.png) | Earlier mock-portal screenshot showing Member not found with an empty input. It has the old portal layout and is not claimed as a screenshot from the canonical run or current code. |
-| [replay_recovered.jsonl](replay_recovered.jsonl) | Historical sanitized terminal-run reconstruction showing a transient Search Member error and recovery. Current fault injection is separately exercised in CI. |
-| [replay_failure.jsonl](replay_failure.jsonl) | Historical sanitized reconstruction showing two retries then `STEP_EXECUTION_FAILED`. Its referenced `failure_step_3.png` was not committed. Run the documented persistent-failure check to produce a new masked image. |
-| [handoff_log.jsonl](handoff_log.jsonl) | Historical sanitized reconstruction of one same-session verification handoff; predates the new structured human-action category. Its referenced `handoff_required.png` was not committed. |
-| [subaccount_discovery.jsonl](subaccount_discovery.jsonl), [deposit_discovery.jsonl](deposit_discovery.jsonl) | Sanitized historical examples reaching review without committing a transaction. |
+| [example_capability.json](example_capability.json) | Stable Member Lookup fixture for exception and handoff tests. |
+| [replay_business_outcome.jsonl](replay_business_outcome.jsonl), [business_outcome.png](business_outcome.png) | Sanitized terminal-run reconstruction and an earlier portal screenshot showing Member not found. The screenshot uses the old layout. |
+| [replay_recovered.jsonl](replay_recovered.jsonl), [replay_failure.jsonl](replay_failure.jsonl) | Historical sanitized reconstructions. Current recovery/failure behavior is exercised in CI. The failure log's `failure_step_3.png` was not committed. |
+| [handoff_log.jsonl](handoff_log.jsonl) | Historical same-session handoff reconstruction, before the new audit category. Its `handoff_required.png` was not committed. |
+| [subaccount_discovery.jsonl](subaccount_discovery.jsonl), [deposit_discovery.jsonl](deposit_discovery.jsonl) | Sanitized historical runs reaching review without financial commitment. |
 
-`discovery_log.jsonl`, `replay_success.jsonl` and the other interactive outputs are supplementary historical/runtime paths. Use the canonical manifest for one coherent discovery-to-replay thread instead of combining unrelated runs.
+Other interactive log paths are supplementary. Do not combine them with the canonical manifest as though they were one run. Five obsolete screenshots exposing synthetic member details were removed from this tree; their deletion did not rewrite history. Rerunning an interactive demo can create new images at those paths.
 
-Five obsolete screenshots (`discovery_final.png`, `replay_final.png`, `handoff_final.png`, `manual_surface_test.png`, `failure_step_2.png`) exposed unmasked synthetic member details and were removed from the submission tree. Their deletion does not rewrite Git history. The current screenshot helper masks form controls and common data/error regions; rerunning an interactive demo may create new files at those names. Review any newly generated evidence before publishing it.
-
-## Current automated evidence
-
-[Verify BankPilot](../.github/workflows/verify.yml) starts the real mock portal and Chromium without an LLM key. It checks two members, a missing member, invalid-amount preflight rejection, recovery from an injected locator failure, and exhausted retries. These controlled failures test execution behavior; they do not claim a real production outage or manual human operation.
-
-The workflow publishes redacted JSONL files and the masked failure screenshot as the `deterministic-replay-evidence` Actions artifact. They belong to that CI run and its checked-out commit, not to the older model-run manifest. The [documented baseline run](https://github.com/Vishnu1721/bankpilot/actions/runs/35280403340) predates the two added fault scenarios and artifact upload; check the latest PR run for those results.
-
-JSONL uses `[REDACTED]` and category-specific markers; reusable capabilities use input placeholders and generic descriptions rather than replacement identities. Console output intentionally shows mock test results and is not privacy-filtered. Pattern-based checks and DOM masks are incomplete for unknown applications, so absence of a detected pattern is not a universal privacy guarantee.
+Logs use `[REDACTED]` and category-specific markers; capabilities use placeholders rather than customer values. Screenshot masks cover known data regions. Review new evidence before sharing it: pattern checks are incomplete for unfamiliar UIs, and console output is not privacy-filtered.
