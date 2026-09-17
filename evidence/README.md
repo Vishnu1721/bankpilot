@@ -2,9 +2,9 @@
 
 ## Final submission status
 
-**Model recording refresh is still pending.** The committed [manifest](end_to_end_manifest.json) attributes the existing run to source `a95e6580ada2991a5bf5ceb7ab00d11aaff40cc4`. Keep that attribution until a real discovery run replaces these files. The recording is inspectable, but it does not demonstrate all later code changes.
+**The refreshed model recording is committed.** The [manifest](end_to_end_manifest.json) records a clean run from source `1ad029ede8d3af355d1f16b98af320aa31b9a838` on September 17, 2026. It used `python -m tests.test_end_to_end`, OpenAI model `gpt-5.6-luna`, and deterministic replay without model calls. [PR #13](https://github.com/Vishnu1721/bankpilot/pull/13) merged the recording into `main` as `d56825f`. All five recorded file hashes match the committed files. Later documentation edits do not change the producing source SHA.
 
-**Main CI is verified.** [Run 35283225107](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107) tested main commit `02724287c0031ba174fed14c4688a90b3e244975`: 68 tests and six Chromium scenarios passed. Its [downloadable evidence](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107/artifacts/10523645846) contains redacted replay logs and a masked failure screenshot. CI does not run model discovery or a human operator.
+**Main CI is verified.** [Run 35286790051](https://github.com/Vishnu1721/bankpilot/actions/runs/35286790051) tested main commit `d56825fdd40830d337aadb4575fb4c101bed3eb5`: 78 tests and six Chromium scenarios passed. Its `deterministic-replay-evidence` artifact contains redacted replay logs and a masked failure screenshot. CI does not run model discovery or a human operator.
 
 ## Canonical model recording
 
@@ -16,10 +16,10 @@ These files belong to one discovery-to-replay thread. The currently committed ro
 | [end_to_end_discovery.jsonl](end_to_end_discovery.jsonl) | Observations, five model decisions, reasons and executed actions from the recorded run. |
 | [end_to_end_replay.jsonl](end_to_end_replay.jsonl) | Successful deterministic replay of that artifact for a different member. |
 | [end_to_end_replay.png](end_to_end_replay.png) | Result page with customer values masked. |
-| [end_to_end_transcript.txt](end_to_end_transcript.txt) | Privacy-edited transcript of the same route. Future refreshes generate it directly from the redacted JSONL. |
-| [end_to_end_manifest.json](end_to_end_manifest.json) | Producing source SHA and run modes. The updated recorder also adds the model, capture time and file hashes. |
+| [end_to_end_transcript.txt](end_to_end_transcript.txt) | Event transcript generated directly from this run's redacted JSONL. |
+| [end_to_end_manifest.json](end_to_end_manifest.json) | Producing source SHA, run modes, model, capture time and file hashes. |
 
-### Refresh from the final code
+### Record a future implementation change
 
 Merge code changes first. Use a clean checkout with your local `.env` containing `OPENAI_API_KEY`; do not paste the key into a transcript or commit it. Keep `python demo_app/app.py` running in another terminal.
 
@@ -46,7 +46,7 @@ git commit -m "Record discovery and replay from final implementation"
 git push -u origin evidence/final-model-run
 ```
 
-Update the status paragraph above with the new source SHA and remove the pending-refresh note in README/REPORT only after inspecting the actual run. Open and merge the evidence PR, then check that the latest [main Actions run](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml?query=branch%3Amain) is green. An evidence commit naturally follows the source commit that produced it; do not substitute the later commit SHA for the recorded source.
+Update the status above and the README/REPORT references only after inspecting the new run. Open and merge the evidence PR, then check that the latest [main Actions run](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml?query=branch%3Amain) is green. An evidence commit naturally follows the source commit that produced it; do not substitute the later commit SHA for the recorded source. Documentation-only changes do not require another model recording.
 
 ## Supplementary and historical runs
 

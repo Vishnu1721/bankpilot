@@ -6,6 +6,20 @@ BankPilot discovers a workflow in a mock banking UI, saves it as a reusable capa
 
 The main components are `DiscoveryAgent`, `BrowserSurface`, `SafetyPolicy`, `CapabilityRecorder`, `ReplayEngine`, `CapabilityRouter` and `HumanHandoffManager`.
 
+```mermaid
+flowchart TD
+    Input["Goal + target"] --> Discovery["DiscoveryAgent (LLM)"]
+    Discovery -->|Verified finish| Artifact["CapabilityRecorder: JSON artifact"]
+    Artifact --> Replay["ReplayEngine + new inputs (no LLM)"]
+    Discovery <-->|Observe and act| Surface["SafetyPolicy + BrowserSurface"]
+    Replay <-->|Execute and check| Surface
+    Surface -->|Blocked or needs help| Human["HumanHandoffManager"]
+    Human -->|Same session, then resume| Surface
+    Replay -->|Identity, outputs and checkpoint pass| Result["Result + redacted evidence"]
+```
+
+Read the main path from top to bottom: discover a working flow, record it, then replay it with new inputs. Both phases use policy-checked browser actions. When handoff is enabled, the operator works in the paused run's browser; resuming still requires validation. A later replay starts its own session.
+
 Discovery reads visible controls and page text, asks for one action, checks it against policy, then executes it. The model refers to an observed element ID rather than supplying code or selectors. Recorder code parameterizes the trace and builds the supported banking contracts. `main.py discover` accepts the goal and target; `replay` accepts the artifact and new inputs.
 
 Python keeps validation and browser control in one process. Playwright's synchronous API makes session ownership straightforward: the same page stays alive across steps and handoffs. The trade-off is one blocked process per active run. Discovery uses OpenAI's Responses API with configurable `OPENAI_MODEL` (default `gpt-5.6-luna`). Each request makes a short, bounded decision; model cost and latency have not been benchmarked.
@@ -63,4 +77,4 @@ JSONL redacts sensitive keys and known SSN, identifier, currency and name patter
 
 Real banking integrations, production authentication, desktop drivers, coordinate control, queues, tenant databases and an operator dashboard were left out. The next work would be browser-level enforcement for script redirects, stronger business checkpoints, completing the surface separation and authenticated operator audit. Model-assisted repair should create a new reviewed artifact rather than silently changing replay behavior.
 
-[Main CI run 35283225107](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107) verified commit `0272428`: 68 tests and six Chromium scenarios. The evidence refresh changes add ten regressions, bringing the configured suite to 78. Model discovery and actual human intervention remain separate from unattended CI. The [evidence index](evidence/README.md) records the remaining submission task: a fresh genuine model run from the final code, using the operator's API key.
+[Main CI run 35286790051](https://github.com/Vishnu1721/bankpilot/actions/runs/35286790051) verified commit `d56825f`: 78 tests and six Chromium scenarios. The committed model recording was generated from source `1ad029e` and merged in PR #13; its manifest includes the source SHA and file hashes. Model discovery and actual human intervention remain separate from unattended CI. The [README walkthrough](README.md#test-edge-cases-step-by-step) gives commands and expected results; the [evidence index](evidence/README.md) distinguishes this recording from historical examples.

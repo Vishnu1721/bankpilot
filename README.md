@@ -4,6 +4,8 @@ BankPilot learns a workflow by using a browser, saves the steps as a JSON capabi
 
 Discovery uses `DiscoveryAgent` and OpenAI to choose actions from the visible UI. `CapabilityRecorder` saves a parameterized contract. `ReplayEngine` executes it through Playwright, checks the member identity and final result, and pauses in the same browser when human help is enabled.
 
+See the [architecture diagram](REPORT.md#1-architecture) or jump to the [edge-case walkthrough](#test-edge-cases-step-by-step).
+
 [![Verify BankPilot](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml)
 
 ## Quick start
@@ -63,35 +65,118 @@ Both commands support `--headless`; use a visible browser with `--enable-handoff
 
 `--target` is the entry URL; replay uses the saved `start_url`. [SafetyPolicy](src/safety/policy.py) permits only reviewed routes on `http://127.0.0.1:5001` and `http://localhost:5001`. There is no target-URL environment variable. A new website needs its own policy, locators and output/checkpoint definitions.
 
-## Reviewer checks without a model key
+## Test edge cases step by step
 
-These commands read the real UI in headless Chromium. Expected values are assertions against the mock data; they are not returned by the executor without reading the page. Keep currency values single-quoted so the shell does not expand `$`.
+Complete setup above first. Keep `python demo_app/app.py` running in terminal 1. In terminal 2, open the repository and run `source .venv/bin/activate`. **None of the checks below needs an API key.**
 
-```bash
-python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35'
-python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75'
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND
-python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT
-```
+Steps 1–5 use headless Chromium, so no browser window appears. Each prints `HEADLESS REPLAY PASS` and exits with code 0 only when the expected status, code and outputs match. For an intentional failure, that means the failure was handled correctly. The expected balances are assertions; replay must still read them from the UI. Keep `$` values single-quoted.
 
-Each prints `HEADLESS REPLAY PASS` only if the result matches. The invalid amount is rejected before navigation. Change `--artifact`, `--param` and expected outputs to check another reviewed contract. Use `--log-path` to keep separate logs; the default is `tmp/reviewer_replay.jsonl`.
-
-For retry and failure tests, add a deliberate fault at the browser adapter:
+### 1. Confirm normal replay
 
 ```bash
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode once --expect-status success --expect-recovered-step step_3 --expect-output 'savings_balance=$2150.75'
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode persistent --expect-status failure --expect-code STEP_EXECUTION_FAILED --expect-failed-step step_3
+python -m tests.test_headless_replay \
+  --artifact artifacts/lookup_savings_balance.json --param member_id=10024 \
+  --expect-status success --expect-output 'savings_balance=$2150.75' \
+  --log-path tmp/balance_10024.jsonl
 ```
 
-To see a human handoff, run `python -m tests.test_handoff`. It uses member `10025` and checks that exactly one handoff occurs. Click **Complete Verification** in the same browser, then describe the action in the terminal to resume. Expected balance: `$3675.20`. Blank notes or unchanged state are rejected; `/cancel` stops the run.
+Expect `status: success` and `savings_balance: $2150.75`. To test a different member, change the input to `10023` and expected output to `'savings_balance=$4820.35'`. You can also supply another reviewed artifact and its parameters.
+
+### 2. Look up a missing member
+
+```bash
+python -m tests.test_headless_replay \
+  --artifact evidence/example_capability.json --param member_id=99999 \
+  --expect-status business_outcome --expect-code MEMBER_NOT_FOUND \
+  --log-path tmp/member_not_found.jsonl
+```
+
+Expect `business_outcome`, `MEMBER_NOT_FOUND` and empty outputs. This is a valid application response, not a crashed run. The stable Member Lookup fixture is used for this case and the retry/handoff cases below.
+
+### 3. Reject an invalid deposit
+
+```bash
+python -m tests.test_headless_replay \
+  --artifact artifacts/prepare_deposit.json \
+  --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo \
+  --expect-status business_outcome --expect-code INVALID_AMOUNT \
+  --log-path tmp/invalid_amount.jsonl
+```
+
+Expect `business_outcome` and `INVALID_AMOUNT`. This input check stops before navigation; it does not submit a deposit or test the form's HTML validation.
+
+### 4. Recover from one temporary failure
+
+```bash
+python -m tests.test_headless_replay \
+  --artifact evidence/example_capability.json --param member_id=10024 \
+  --fail-target 'Search Member' --failure-mode once \
+  --expect-status success --expect-recovered-step step_3 \
+  --expect-output 'savings_balance=$2150.75' --log-path tmp/recovered.jsonl
+```
+
+Expect one retry, then `success` with `recovered_steps: ["step_3"]` and the balance. The test deliberately fails target lookup once while using the real browser and replay engine.
+
+### 5. Stop after persistent failure
+
+```bash
+python -m tests.test_headless_replay \
+  --artifact evidence/example_capability.json --param member_id=10024 \
+  --fail-target 'Search Member' --failure-mode persistent \
+  --expect-status failure --expect-code STEP_EXECUTION_FAILED \
+  --expect-failed-step step_3 --log-path tmp/hard_failure.jsonl
+```
+
+Expect two retries, then `failure`, `STEP_EXECUTION_FAILED` and `failed_step: step_3`. A masked screenshot is saved to `evidence/failure_step_3.png`. **`HARD FAILURE` followed by `HEADLESS REPLAY PASS` is correct here:** the test expected a bounded failure and verified it.
+
+### 6. Complete a human handoff
+
+```bash
+python -m tests.test_handoff
+```
+
+1. A visible browser opens and searches for member `10025`.
+2. Wait for `HUMAN INTERVENTION REQUIRED` and `Control owner: human` in the terminal.
+3. In that same browser window, click **Complete Verification**.
+4. Return to the terminal, type `Completed manual verification`, and press Enter.
+5. Expect `Control owner: automation`, `status: success`, balance `$3675.20` and `Human handoffs: 1`.
+6. Press Enter at **Press Enter to close...** after inspecting the result.
+
+The log is `evidence/handoff_log.jsonl`; the masked screenshots are `evidence/handoff_required.png` and `evidence/handoff_final.png`. Blank notes or an unchanged page stop the run. `/cancel` terminates it, so the success-only demo assertion will fail if you cancel. The cancellation regression in step 7 verifies that behavior automatically.
+
+Want to watch the other cases? Run `python -m tests.test_business_outcome`, `python -m tests.test_recoverable_replay` or `python -m tests.test_hard_failure` one at a time. Each opens a visible browser, asserts its expected result and waits for Enter before closing.
+
+### 7. Check safety and the less visible edge cases
+
+```bash
+python -m pytest -q tests
+```
+
+Expect **78 passed**. This suite needs neither the portal nor a browser. It uses fake surfaces and Flask's test client for controlled failures:
+
+| Check | Where to inspect or rerun it |
+| --- | --- |
+| Prompt injection, loop limits and blocked financial commitment | `tests/test_security_boundaries.py` |
+| Missing outputs, false success, blank/unchanged handoff and redaction | `tests/test_hardening.py` |
+| Wrong member identity, wrong origin/port, registry privacy and budget handoff | `tests/test_submission_gaps.py` |
+| Pre-click destination checks, injection handoff, metadata privacy, permission/session/authentication/verification errors, locked accounts, dialogs and temporary service errors | `tests/test_final_hardening.py` |
+| Operator cancellation, CLI inputs and retry fault injection | `tests/test_reviewer_cli.py` |
+
+To isolate a case, use its test name, for example:
+
+```bash
+python -m pytest -q tests/test_reviewer_cli.py::test_operator_can_cancel_without_resuming
+```
+
+The extra runtime states in the table are simulated unit cases, not separate live login/server-failure demonstrations. Browser demos create screenshots and may update supplementary evidence logs. Check `git status --short` afterward; keep local results separate from the committed canonical recording. A new `test_end_to_end` recording requires a clean checkout.
 
 ## Tests and evidence
 
 `pytest -q tests` runs **78 checks**. These cover contracts, policies, privacy, routing, handoff, CLI wiring and evidence publication using fake surfaces or Flask's test client. [pytest.ini](pytest.ini) lists the included modules. Interactive browser/model demos run separately.
 
-[Main CI run 35283225107](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107) passed for commit `0272428`: **68 tests and all six Chromium scenarios above**. This change adds ten evidence-generation regressions. The badge shows the current `main` result; the [workflow](.github/workflows/verify.yml) also runs on every PR and uploads redacted replay logs and a masked failure image. It does not call a model or simulate a human as proof of manual intervention.
+[Main CI run 35286790051](https://github.com/Vishnu1721/bankpilot/actions/runs/35286790051) passed for commit `d56825f`: **78 tests and six Chromium scenarios** (both normal member inputs, missing member, invalid amount, recovery and exhausted retries). The badge shows the current `main` result; the [workflow](.github/workflows/verify.yml) also runs on every PR and uploads redacted replay logs and a masked failure image. It does not call a model or simulate a human as proof of manual intervention.
 
-The [evidence index](evidence/README.md) separates the canonical model recording, current CI results and historical examples. **A fresh model recording from the final code is still required before submission.** The existing manifest names its original source commit; its files have not been relabeled as a new run.
+The [evidence index](evidence/README.md) separates the canonical model recording, CI results and historical examples. **The fresh model recording is committed through [PR #13](https://github.com/Vishnu1721/bankpilot/pull/13).** It was produced from clean source commit `1ad029e`: five model decisions through Balance Lookup, followed by successful deterministic replay for a different member. The manifest records that producing commit, not the later evidence merge commit.
 
 To refresh from a clean, committed checkout with the portal and model key available:
 
