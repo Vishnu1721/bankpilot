@@ -7,6 +7,10 @@ import main as cli
 from src.capability.results import ReplayResult, ReplayStatus
 from src.handoff.manager import HumanHandoffManager, HandoffCancelled
 from tests.test_headless_replay import build_parser, verify_result
+from tests.fault_surface import FaultInjectionSurface
+from src.capability.models import CapabilityStep
+from src.capability.replay import ReplayEngine
+from src.surface.browser import BrowserSurface
 
 
 @pytest.mark.parametrize('member_id', ['10023', '10024', 'reviewer-custom-id'])
@@ -50,7 +54,8 @@ def test_replay_cli_exit_status_and_no_discovery(monkeypatch, tmp_path, status, 
 
 
 @pytest.mark.parametrize('field,bad_value', [('status', ReplayStatus.FAILURE),
-    ('outputs', {'answer': 'wrong'}), ('code', 'UNEXPECTED')])
+    ('outputs', {'answer': 'wrong'}), ('code', 'UNEXPECTED'),
+    ('recovered_steps', ['step_3']), ('failed_step', 'step_3')])
 def test_reviewer_checker_rejects_wrong_results(field, bad_value):
     args = build_parser().parse_args(['--artifact', 'custom.json', '--param', 'id=42',
         '--expect-status', 'success', '--expect-output', 'answer=expected'])
@@ -77,3 +82,27 @@ def test_headless_handoff_rejected_before_browser_start(monkeypatch):
     with pytest.raises(SystemExit):
         cli.main(['replay', '--artifact', 'any.json', '--headless', '--enable-handoff'])
     browser.assert_not_called()
+
+
+@pytest.mark.parametrize('mode,failures', [('once', 1), ('persistent', 3)])
+def test_injected_failure_reaches_current_replay_adapter(monkeypatch, tmp_path, mode, failures):
+    """Catch stale engine-hook injections that stop exercising actual replay."""
+    surface = FaultInjectionSurface('Search Member', mode)
+    surface.page = Mock()
+    surface.page.url = 'http://127.0.0.1:5001/member-search'
+    monkeypatch.setattr(surface, 'body_text', lambda: 'Member Lookup')
+    monkeypatch.setattr(surface, 'target_destination', lambda target: None)
+    locator = Mock()
+    monkeypatch.setattr(BrowserSurface, 'find_target', lambda self, target: locator)
+    engine = ReplayEngine(surface, log_path=tmp_path / 'replay.jsonl', retry_delay_ms=0)
+    step = CapabilityStep(step_id='step_3', action='click',
+        target={'role': 'button', 'name': 'Search Member'}, description='Search')
+
+    if mode == 'once':
+        assert engine._execute_step_with_retry(step, None, {}, {}) is True
+        locator.click.assert_called_once()
+    else:
+        with pytest.raises(RuntimeError, match='remained unavailable'):
+            engine._execute_step_with_retry(step, None, {}, {})
+        locator.click.assert_not_called()
+    assert surface.injected_failures == failures

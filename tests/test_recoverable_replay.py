@@ -1,5 +1,5 @@
 from src.capability.replay import ReplayEngine
-from src.surface.browser import BrowserSurface
+from tests.fault_surface import FaultInjectionSurface
 
 
 CAPABILITY_PATH = (
@@ -8,55 +8,18 @@ CAPABILITY_PATH = (
 )
 
 
-class RecoverableReplayEngine(
-    ReplayEngine
-):
-
-    def __init__(
-        self,
-        surface
-    ):
-        super().__init__(
-            surface,
-            max_retries=2,
-            retry_delay_ms=500,
-            log_path=(
-                "evidence/"
-                "replay_recovered.jsonl"
-            )
-        )
-
-        self.simulated_failure = False
-
-    def _find_target(
-        self,
-        target
-    ):
-        if (
-            target.name == "Search Member"
-            and not self.simulated_failure
-        ):
-            self.simulated_failure = True
-
-            raise RuntimeError(
-                "Simulated temporary "
-                "UI condition."
-            )
-
-        return super()._find_target(
-            target
-        )
-
-
-surface = BrowserSurface(
-    headless=False
+surface = FaultInjectionSurface(
+    "Search Member", failure_mode="once", headless=False
 )
 
 try:
     surface.start()
 
-    engine = RecoverableReplayEngine(
-        surface
+    engine = ReplayEngine(
+        surface,
+        max_retries=2,
+        retry_delay_ms=500,
+        log_path="evidence/replay_recovered.jsonl",
     )
 
     capability = (
