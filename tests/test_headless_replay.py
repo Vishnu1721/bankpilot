@@ -7,6 +7,7 @@ from main import key_value
 
 from src.capability.replay import ReplayEngine
 from src.surface.browser import BrowserSurface
+from tests.fault_surface import FaultInjectionSurface
 
 
 def build_parser():
@@ -17,6 +18,10 @@ def build_parser():
                         choices=['success', 'business_outcome', 'failure'])
     parser.add_argument('--expect-code')
     parser.add_argument('--expect-output', action='append', type=key_value, default=[])
+    parser.add_argument('--expect-recovered-step', action='append', default=[])
+    parser.add_argument('--expect-failed-step')
+    parser.add_argument('--fail-target', help='Inject a test-only locator failure for this target name.')
+    parser.add_argument('--failure-mode', choices=['once', 'persistent'], default='once')
     parser.add_argument('--log-path', default='tmp/reviewer_replay.jsonl')
     return parser
 
@@ -25,11 +30,16 @@ def verify_result(result, args):
     assert result.status.value == args.expect_status, result
     assert result.code == args.expect_code, result
     assert result.outputs == dict(args.expect_output), result
+    assert result.recovered_steps == args.expect_recovered_step, result
+    assert result.failed_step == args.expect_failed_step, result
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    surface = BrowserSurface(headless=True).start()
+    surface = (
+        FaultInjectionSurface(args.fail_target, args.failure_mode, headless=True)
+        if args.fail_target else BrowserSurface(headless=True)
+    ).start()
     try:
         engine = ReplayEngine(
             surface,

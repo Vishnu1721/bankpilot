@@ -1,5 +1,5 @@
 from src.capability.replay import ReplayEngine
-from src.surface.browser import BrowserSurface
+from tests.fault_surface import FaultInjectionSurface
 
 
 CAPABILITY_PATH = (
@@ -8,33 +8,14 @@ CAPABILITY_PATH = (
 )
 
 
-class HardFailureReplayEngine(
-    ReplayEngine
-):
-
-    def _find_target(
-        self,
-        target
-    ):
-        if target.name == "Search Member":
-            raise RuntimeError(
-                "Search target remained "
-                "unavailable."
-            )
-
-        return super()._find_target(
-            target
-        )
-
-
-surface = BrowserSurface(
-    headless=False
+surface = FaultInjectionSurface(
+    "Search Member", failure_mode="persistent", headless=False
 )
 
 try:
     surface.start()
 
-    engine = HardFailureReplayEngine(
+    engine = ReplayEngine(
         surface,
         max_retries=2,
         retry_delay_ms=500,

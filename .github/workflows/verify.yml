@@ -28,7 +28,20 @@ jobs:
           exit 1
       - name: Replay committed artifact without an LLM
         run: |
-          python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35'
-          python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75'
-          python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND
-          python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT
+          python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35' --log-path tmp/balance_10023.jsonl
+          python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75' --log-path tmp/balance_10024.jsonl
+          python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND --log-path tmp/member_not_found.jsonl
+          python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT --log-path tmp/invalid_amount.jsonl
+      - name: Verify injected recovery and exhausted retries in Chromium
+        run: |
+          python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode once --expect-status success --expect-recovered-step step_3 --expect-output 'savings_balance=$2150.75' --log-path tmp/recovered.jsonl
+          python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode persistent --expect-status failure --expect-code STEP_EXECUTION_FAILED --expect-failed-step step_3 --log-path tmp/hard_failure.jsonl
+      - name: Save redacted deterministic replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-replay-evidence
+          path: |
+            tmp/*.jsonl
+            evidence/failure_step_3.png
+          if-no-files-found: warn
