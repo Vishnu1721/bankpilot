@@ -13,6 +13,7 @@ from src.capability.models import (
     SuccessCondition,
     TargetDefinition,
 )
+from src.safety.artifact import ArtifactMetadataGuard
 
 
 class CapabilityRecorder:
@@ -40,6 +41,10 @@ class CapabilityRecorder:
             return
 
         target = self._find_element(action.element_id, observation)
+        metadata = ArtifactMetadataGuard(self.parameters.values())
+        target_role = metadata.validate(target.role, "target.role")
+        target_name = metadata.validate(target.name, "target.name")
+        target_selector = metadata.validate(target.selector, "target.selector")
         value = (
             self._parameterize_value(action.value, action.action)
             if action.action in {ActionType.TYPE, ActionType.SELECT}
@@ -56,12 +61,12 @@ class CapabilityRecorder:
                 step_id=f"step_{len(self.recorded_steps) + 1}",
                 action=action_map[action.action],
                 target=TargetDefinition(
-                    role=target.role,
-                    name=target.name,
-                    selector=target.selector,
+                    role=target_role,
+                    name=target_name,
+                    selector=target_selector,
                 ),
                 value=value,
-                description=f"{verb} {target.name}.",
+                description=f"{verb} {target_name}.",
             )
         )
 
@@ -193,6 +198,9 @@ class CapabilityRecorder:
                 if final_observation and final_observation.title
                 else "Workflow Complete"
             )
+            checkpoint = ArtifactMetadataGuard(
+                self.parameters.values()
+            ).validate(checkpoint, "success_condition.value")
             success = SuccessCondition(type="title_equals", value=checkpoint)
 
         parameter_definitions = [
@@ -219,10 +227,26 @@ class CapabilityRecorder:
         )
 
     def save(self, capability, path):
+        self._validate_ui_metadata(capability)
         output = Path(path)
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("w", encoding="utf-8") as file:
             json.dump(capability.model_dump(mode="json"), file, indent=2)
+
+    def _validate_ui_metadata(self, capability):
+        """Defense in depth for capabilities assembled outside record_action."""
+        metadata = ArtifactMetadataGuard(self.parameters.values())
+        for step in capability.steps:
+            if step.target:
+                metadata.validate(step.target.role, f"{step.step_id}.target.role")
+                metadata.validate(step.target.name, f"{step.step_id}.target.name")
+                metadata.validate(
+                    step.target.selector, f"{step.step_id}.target.selector"
+                )
+        metadata.validate(
+            capability.success_condition.value,
+            "success_condition.value",
+        )
 
     @staticmethod
     def _find_element(element_id, observation):

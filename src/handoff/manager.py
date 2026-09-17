@@ -2,6 +2,10 @@ from pathlib import Path
 import hashlib
 
 
+class HandoffCancelled(RuntimeError):
+    """Operator explicitly terminated the run; never resume automation."""
+
+
 class HumanHandoffManager:
 
     def __init__(
@@ -67,8 +71,10 @@ class HumanHandoffManager:
 
         human_action = input(
             "\nAfter completing verification, briefly describe what you did "
-            "and press Enter (a blank response cannot resume): "
+            "and press Enter, or type /cancel to terminate (blank cannot resume): "
         ).strip()
+        if human_action.lower() == "/cancel":
+            raise HandoffCancelled("Operator cancelled the intervention; automation stopped.")
         if not human_action:
             raise RuntimeError("Resume rejected: describe the completed human action.")
         if self._state_fingerprint() == before_state:
@@ -86,9 +92,25 @@ class HumanHandoffManager:
         return {
             "control_owner": "automation",
             "human_action": human_action,
+            "human_action_type": self._action_type(reason),
             "url": url,
             "screenshot": str(screenshot_path),
         }
+
+    @staticmethod
+    def _action_type(reason):
+        normalized = reason.lower()
+        if "untrusted ui" in normalized or "injection" in normalized:
+            return "reviewed_untrusted_ui"
+        if "verification" in normalized:
+            return "completed_manual_verification"
+        if "session" in normalized or "authentication" in normalized:
+            return "restored_authenticated_session"
+        if "permission" in normalized:
+            return "resolved_permission_block"
+        if "dialog" in normalized:
+            return "resolved_unexpected_dialog"
+        return "completed_manual_intervention"
 
     def _state_fingerprint(self):
         page = self.surface.page

@@ -1,5 +1,4 @@
 from pathlib import Path
-from urllib.parse import urljoin
 
 from playwright.sync_api import sync_playwright
 
@@ -13,11 +12,13 @@ class BrowserSurface:
         self.playwright = None
         self.browser = None
         self.page = None
+        self._unexpected_dialog = None
 
     def start(self):
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(headless=self.headless)
         self.page = self.browser.new_page()
+        self.page.on("dialog", self._handle_dialog)
         return self
 
     def navigate(self, url):
@@ -71,6 +72,13 @@ class BrowserSurface:
             self.click(element.selector)
         else:
             raise ValueError(f"Unsupported browser action: {action.action.value}")
+
+    def action_destination(self, action, observation):
+        """Resolve a discovery click destination without navigating to it."""
+        if action.action.value != "click" or action.element_id is None:
+            return None
+        element = self._find_element(action.element_id, observation)
+        return self._navigation_destination(self.page.locator(element.selector))
 
     def _find_element(self, element_id, observation):
         for element in observation.elements:
@@ -128,8 +136,22 @@ class BrowserSurface:
 
     def target_destination(self, target):
         locator = self.find_target(target)
-        href = locator.get_attribute("href")
-        return urljoin(self.page.url, href) if href else None
+        return self._navigation_destination(locator)
+
+    def _navigation_destination(self, locator):
+        # Resolve against document.baseURI, including <base> and form overrides.
+        # Script-driven navigation cannot be predicted by static inspection.
+        return locator.evaluate("""el => {
+            if (el.hasAttribute('href'))
+                return new URL(el.getAttribute('href'), document.baseURI).href;
+            const tag = el.tagName.toLowerCase();
+            const submits = (tag === 'button' && el.type === 'submit') ||
+                (tag === 'input' && ['submit', 'image'].includes(el.type));
+            if (submits && el.form) {
+                return el.hasAttribute('formaction') ? el.formAction : el.form.action;
+            }
+            return null;
+        }""")
 
     def fill_target(self, target, value):
         self.find_target(target).fill(value)
@@ -164,6 +186,17 @@ class BrowserSurface:
             if text:
                 messages.append(text)
         return messages
+
+    def consume_unexpected_dialog(self):
+        message = self._unexpected_dialog
+        self._unexpected_dialog = None
+        return message
+
+    def _handle_dialog(self, dialog):
+        # Dismissing an unexpected dialog is the conservative browser action;
+        # replay then classifies the condition and stops or requests handoff.
+        self._unexpected_dialog = dialog.message
+        dialog.dismiss()
 
     def _get_role(self, control, tag):
         if tag == "input":

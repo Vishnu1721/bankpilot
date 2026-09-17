@@ -16,6 +16,33 @@ cp .env.example .env
 
 Set `OPENAI_API_KEY` in `.env`. Deterministic replay and unit checks do not call the model.
 
+## CLI discovery and replay
+
+`main.py` accepts the assignment's goal and target as real runtime inputs rather
+than embedding them in a test. With the portal running:
+
+```bash
+python main.py discover \
+  --goal "Look up member 10023 and return their current savings balance" \
+  --target http://127.0.0.1:5001 \
+  --artifact artifacts/cli_savings_balance.json \
+  --param member_id=10023
+```
+
+Replay that saved artifact with a different runtime input and no LLM call:
+
+```bash
+python main.py replay \
+  --artifact artifacts/cli_savings_balance.json \
+  --param member_id=10024
+```
+
+Both commands support `--headless`. Use `--enable-handoff` only with a visible
+browser so a person can operate the preserved session. Discovery also supports
+`--overwrite` after reviewing an existing artifact. The CLI applies the same
+origin/route policy and budgets as the demonstrations. Run
+`python main.py discover --help` or `python main.py replay --help` for details.
+
 ## Start the mock portal
 
 In terminal 1:
@@ -53,7 +80,7 @@ python -m tests.test_replay
 
 Both interactive scripts pause before closing so you can inspect the UI; press Enter to continue. Discovery creates `artifacts/lookup_savings_balance.json`; replay reads that file with member `10024` and writes `evidence/replay_success.jsonl` plus `evidence/replay_final.png`.
 
-The complete canonical evidence set is committed: `artifacts/lookup_savings_balance.json`, `evidence/end_to_end_discovery.jsonl`, `evidence/end_to_end_replay.jsonl`, `evidence/end_to_end_replay.png`, and the privacy-redacted `evidence/end_to_end_transcript.txt`. The discovery run chose the valid Member Lookup route, and replay used that exact generated artifact with a different member input. `evidence/end_to_end_manifest.json` records the paths and provenance. Rerunning model-driven discovery still requires your own `OPENAI_API_KEY`; deterministic replay and the committed evidence remain inspectable without it.
+The complete canonical evidence set is committed: `artifacts/lookup_savings_balance.json`, `evidence/end_to_end_discovery.jsonl`, `evidence/end_to_end_replay.jsonl`, `evidence/end_to_end_replay.png`, and the privacy-redacted `evidence/end_to_end_transcript.txt`. The discovery run chose the valid Balance Lookup route, and replay used that exact generated artifact with a different member input. `evidence/end_to_end_manifest.json` records the producing source commit, evidence commit, command, and discovery/replay modes. The canonical command now captures `git rev-parse HEAD` and worktree cleanliness before discovery changes any evidence files, then rewrites the manifest after a successful replay. Rerunning model-driven discovery requires your own `OPENAI_API_KEY`; deterministic replay and the committed evidence remain inspectable without it.
 
 ## Independent operations
 
@@ -107,7 +134,7 @@ Run the complete non-browser regression suite (including `test_capability_model.
 pytest -q tests
 ```
 
-Expected result: `37 passed`. `pytest.ini` deliberately excludes interactive browser/discovery demonstration modules; those remain executable through their documented `python -m ...` commands and are not deprecated tests.
+Expected result: `64 passed`. `pytest.ini` deliberately excludes interactive browser/discovery demonstration modules; those remain executable through their documented `python -m ...` commands and are not deprecated tests. CLI wiring tests use explicit fakes; they do not constitute live model or browser evidence.
 
 The equivalent individual checks include:
 
@@ -118,6 +145,7 @@ python -m tests.test_security_boundaries
 python -m tests.test_mock_subaccount
 python -m tests.test_capability_outputs
 python -m tests.test_capability_router
+python -m pytest -q tests/test_final_hardening.py
 ```
 
 Then verify deterministic success and exceptional paths while the portal is running:
@@ -141,6 +169,12 @@ The edge-case tests deliberately load the committed fixture `evidence/example_ca
 
 For handoff, click **Complete Verification** in the preserved browser, return to the terminal, and describe the completed action. A blank response or unchanged browser state is rejected. The handoff manager can also be attached to ordinary replay and discovery, allowing exhausted retries, explicit escalation, or blocked actions to transfer the preserved session. The log records capability, current step, URL, reason, redacted screenshot, control owner, and human action.
 
+Free-form operator notes remain fully redacted in JSONL. A separate reviewed
+`human_action_type` such as `completed_manual_verification`, `reviewed_untrusted_ui`, or
+`restored_authenticated_session` is retained for audit reporting. The runtime
+handoff captures `evidence/handoff_required.png`; the repository's committed
+representative completed-run image is `evidence/handoff_final.png`.
+
 Verified deterministic outputs:
 
 ```text
@@ -155,7 +189,57 @@ Verified deterministic outputs:
 
 UI text is tagged and sanitized as untrusted model input. Discovery has explicit step, model-call, time, observation-size, and repeated-state budgets. Policy requires both an approved host and an explicitly declared route; every route declares permitted action kinds and exact clickable target names. A generic `Proceed` is rejected even on an approved host. Consequential routes and targets are absent from the allowlist, while mock commit endpoints independently return `403`.
 
+Before a discovery click is recorded or executed, the surface resolves its
+navigation destination and the policy validates the destination origin and
+route. Prompt-injection-like observations fail closed; when handoff is enabled,
+they create an intervention request in the preserved session instead of ending
+as an unclassified discovery exception.
+
 Logs recursively redact sensitive keys and sensitive-looking values in free text, including member-number patterns, currency values, SSNs, and person-name patterns. Browser evidence masks form controls and common result/error regions. Discovery cannot save an artifact merely because the model says `finish`: the observed title, URL, or rendered text must satisfy the typed checkpoint. Replay validates input types, rejects unexpected inputs and unknown condition types, and maps every extraction to a named declared output.
+
+Artifact serialization has its own fail-closed metadata guard. Runtime values,
+SSNs, email addresses, phone numbers, financial identifiers, likely person
+names, and sensitive-looking selectors or page-title checkpoints cannot be
+stored as reusable UI metadata. Replay also returns explicit codes for
+permission denial, expired sessions, authentication requirements, unexpected
+dialogs, locked accounts, verification failures, and temporarily unavailable
+applications; only the last condition receives bounded automatic retries.
+
+GitHub Actions runs the 64-test suite, starts the mock portal, and executes
+the parameterized headless checker for two member balances, a missing member,
+and an invalid deposit. Model-driven discovery remains outside CI.
+
+## Reviewer checks with your own inputs
+
+Start the portal as described above. No API key is required for replay. The
+checker accepts any reviewed artifact, runtime parameters, and exact expected
+status/code/outputs; it exits nonzero on a mismatch. Expected values below are
+test assertions for the seeded mock data, not values returned by the executor.
+Single-quote amounts so your shell does not expand `$`.
+
+```bash
+python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35'
+python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75'
+python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND
+python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT
+```
+
+To test your newly discovered artifact, substitute its path and expected output.
+For manual verification use `python main.py replay --artifact evidence/example_capability.json --param member_id=10025 --enable-handoff`.
+Complete verification in the same browser and describe it to resume, or enter
+`/cancel` to stop. Automated cancellation and audit-redaction tests need no browser.
+
+This is not an arbitrary-site agent: a new application needs reviewed origins,
+routes, click permissions and output/checkpoint definitions. Adding a URL alone
+does not grant permission. Destination checks include links and HTML form actions
+(including `formaction`); arbitrary JavaScript redirects are not statically
+predictable and would require browser-level request enforcement for production.
+Artifact PII detection is heuristic, not a guarantee for every language or encoding.
+
+The committed model-run evidence predates this hardening branch. Its original
+source SHA is retained honestly in the manifest, not relabeled as a new run.
+After merging, run `python -m tests.test_end_to_end` with your key and review the
+generated evidence and manifest before committing the final submission evidence.
 
 `BrowserSurface` is operational. `TerminalSurface` permits only configured executables with no shell. `DesktopSurface` is an accessibility-tree extension point and is not enabled until platform-specific controls exist.
 
