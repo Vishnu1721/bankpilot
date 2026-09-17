@@ -1,17 +1,14 @@
 # BankPilot
 
-BankPilot uses an LLM to discover a workflow in a live browser, saves a typed JSON capability, and replays it without an LLM. The included LegacyBank Credit Union portal is a mock: account creation and deposits stop at review, and no funds or accounts are committed.
+BankPilot learns a workflow by using a browser, saves the steps as a JSON capability, then replays that capability with new inputs and no LLM calls. The demo looks up a member's savings balance in a mock credit union portal. Deposits and sub-account creation are supporting examples that stop at review.
 
-**Quick demo:** after setup, with the portal running and an OpenAI key configured, run `python -m tests.test_end_to_end`.
-It discovers with member `10023`, saves `artifacts/lookup_savings_balance.json`, then replays that file for member `10024` in a fresh browser.
-Expected: `END-TO-END PASS` and `Replay outputs: {'savings_balance': '$2150.75'}`.
-For a check without an API key, use the reviewer commands below.
+Discovery uses `DiscoveryAgent` and OpenAI to choose actions from the visible UI. `CapabilityRecorder` saves a parameterized contract. `ReplayEngine` executes it through Playwright, checks the member identity and final result, and pauses in the same browser when human help is enabled.
 
 [![Verify BankPilot](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/Vishnu1721/bankpilot/actions/workflows/verify.yml)
 
-## Setup
+## Quick start
 
-Requires Python 3.11+; CI uses Python 3.11 on Ubuntu with Chromium. No Node application setup is required. For a fresh checkout:
+Use Python 3.11 or newer. CI runs Python 3.11 on Ubuntu with Chromium.
 
 ```bash
 git clone https://github.com/Vishnu1721/bankpilot.git
@@ -21,162 +18,104 @@ source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
 cp .env.example .env
-```
-
-If you already have the repository, skip the clone and work from its root. Configure only the settings you need:
-
-| Setting | Purpose |
-| --- | --- |
-| `OPENAI_API_KEY` in `.env` | Required for real discovery; unit tests and deterministic replay need no key. |
-| `OPENAI_MODEL` in `.env` | A model available to your API account; the code default is `gpt-5.6-luna`. Override if needed. |
-| CLI `--target` | Discovery entry URL, e.g. `http://127.0.0.1:5001`. There is no target-URL environment variable. Replay uses the artifact's `start_url`. |
-| [SafetyPolicy](src/safety/policy.py) | Approved origins are `http://127.0.0.1:5001` and `http://localhost:5001`, with explicit route/action rules. A new application requires reviewed policy and contract changes. |
-
-In terminal 1, start the mock portal and leave it running:
-
-```bash
-source .venv/bin/activate
 python demo_app/app.py
 ```
 
-Use terminal 2 from the same repository with `source .venv/bin/activate` for the commands below. There is no offline model-discovery mode; replay and the non-browser tests work without a model service.
+Leave the portal running at `http://127.0.0.1:5001`. In a second terminal, activate the same environment and choose a path:
 
-## Reviewer checks without an API key
+| What to check | Command | Needs an API key? |
+| --- | --- | --- |
+| Discovery → saved artifact → replay | `python -m tests.test_end_to_end` | Yes |
+| Replay the committed artifact | `python main.py replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024` | No |
+| Non-browser regression suite | `pytest -q tests` | No |
 
-The checker opens actual headless Chromium, executes a supplied artifact against the running portal, and asserts status, code, outputs and recovery state. Expected values are assertions against seeded mock data, never execution results supplied to the browser. Single-quote currency values so the shell does not expand `$`.
+The complete demo discovers with member `10023`, saves `artifacts/lookup_savings_balance.json`, and replays it for member `10024` in a fresh browser. Expected output:
 
-```bash
-# Two different members; balances are read from the live UI.
-python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35'
-python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75'
-
-# Expected business outcome, not an execution crash.
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND
-
-# Invalid amount is rejected before navigation.
-python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT
-
-# Explicit test-only failures at the browser adapter boundary.
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode once --expect-status success --expect-recovered-step step_3 --expect-output 'savings_balance=$2150.75'
-python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode persistent --expect-status failure --expect-code STEP_EXECUTION_FAILED --expect-failed-step step_3
+```text
+END-TO-END PASS
+Artifact: artifacts/lookup_savings_balance.json
+Replay outputs: {'savings_balance': '$2150.75'}
 ```
 
-Each command prints `HEADLESS REPLAY PASS` only when its assertions match; mismatches exit nonzero. Substitute your reviewed artifact, `--param` values and expected results to test another contract. JSONL defaults to `tmp/reviewer_replay.jsonl`; use `--log-path` to retain separate runs. A passing failure simulation means the engine correctly refused success.
+For discovery, set `OPENAI_API_KEY` in the ignored `.env` file. `OPENAI_MODEL` defaults to `gpt-5.6-luna`; change it to a model available to your account if needed. Replay and unit tests work without a model service. There is no offline discovery mode.
 
-For a visible human-verification test:
+## Supply your own goal and inputs
 
-```bash
-python main.py replay --artifact evidence/example_capability.json --param member_id=10025 --enable-handoff --log-path tmp/manual_replay.jsonl
-```
-
-Click **Complete Verification** in the preserved browser, return to the terminal, and describe what you did. Automation resumes in that same session and returns `$3675.20`. Blank notes/unchanged state cannot resume; `/cancel` terminates. `python -m tests.test_handoff` additionally asserts exactly one handoff and pauses before closing.
-
-## CLI discovery → artifact → replay
-
-Supply the goal, target and runtime inputs to real model-driven discovery:
+With the portal running:
 
 ```bash
 python main.py discover \
-  --goal "Look up member 10023 and return their current savings balance" \
   --target http://127.0.0.1:5001 \
+  --goal "Look up member 10023 and return their current savings balance" \
   --artifact artifacts/cli_savings_balance.json \
   --param member_id=10023 \
   --log-path tmp/cli_discovery.jsonl
-```
 
-Replay the **same generated file** with a different member and no model call:
-
-```bash
 python main.py replay \
   --artifact artifacts/cli_savings_balance.json \
   --param member_id=10024 \
   --log-path tmp/cli_replay.jsonl
 ```
 
-Expected replay result: `status: success`, `outputs: {"savings_balance": "$2150.75"}`. `--param` values are strings, matching these demo contracts; the Python replay API accepts typed numeric/boolean inputs for other contracts. CLI replay treats the supplied artifact as reviewed; registry approval is a separate library interface.
+The second command reads the file generated by the first and should return `status: success` with `savings_balance: $2150.75`. CLI parameters are strings, matching these demo contracts. The Python API also validates numeric and boolean inputs when a contract declares them.
 
-Both commands accept `--headless` or visible `--enable-handoff`. Discovery defaults to 10 steps/model calls and 120 seconds checked between steps; `--max-steps` and `--timeout-seconds` customize them. Use `--overwrite` to replace an existing artifact after review. See `python main.py discover --help` and `python main.py replay --help`.
+Both commands support `--headless`; use a visible browser with `--enable-handoff`. Discovery supports `--overwrite`, `--max-steps` and `--timeout-seconds` (defaults: 10 steps/calls and 120 seconds, checked between steps). See `python main.py discover --help` and `python main.py replay --help`.
 
-## Canonical evidence run
+`--target` is the entry URL; replay uses the saved `start_url`. [SafetyPolicy](src/safety/policy.py) permits only reviewed routes on `http://127.0.0.1:5001` and `http://localhost:5001`. There is no target-URL environment variable. A new website needs its own policy, locators and output/checkpoint definitions.
 
-With the portal running and `OPENAI_API_KEY` configured:
+## Reviewer checks without a model key
+
+These commands read the real UI in headless Chromium. Expected values are assertions against the mock data; they are not returned by the executor without reading the page. Keep currency values single-quoted so the shell does not expand `$`.
+
+```bash
+python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10023 --expect-status success --expect-output 'savings_balance=$4820.35'
+python -m tests.test_headless_replay --artifact artifacts/lookup_savings_balance.json --param member_id=10024 --expect-status success --expect-output 'savings_balance=$2150.75'
+python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=99999 --expect-status business_outcome --expect-code MEMBER_NOT_FOUND
+python -m tests.test_headless_replay --artifact artifacts/prepare_deposit.json --param member_id=10024 --param account_type=Savings --param amount=0 --param memo=Demo --expect-status business_outcome --expect-code INVALID_AMOUNT
+```
+
+Each prints `HEADLESS REPLAY PASS` only if the result matches. The invalid amount is rejected before navigation. Change `--artifact`, `--param` and expected outputs to check another reviewed contract. Use `--log-path` to keep separate logs; the default is `tmp/reviewer_replay.jsonl`.
+
+For retry and failure tests, add a deliberate fault at the browser adapter:
+
+```bash
+python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode once --expect-status success --expect-recovered-step step_3 --expect-output 'savings_balance=$2150.75'
+python -m tests.test_headless_replay --artifact evidence/example_capability.json --param member_id=10024 --fail-target 'Search Member' --failure-mode persistent --expect-status failure --expect-code STEP_EXECUTION_FAILED --expect-failed-step step_3
+```
+
+To see a human handoff, run `python -m tests.test_handoff`. It uses member `10025` and checks that exactly one handoff occurs. Click **Complete Verification** in the same browser, then describe the action in the terminal to resume. Expected balance: `$3675.20`. Blank notes or unchanged state are rejected; `/cancel` stops the run.
+
+## Tests and evidence
+
+`pytest -q tests` runs **78 checks**. These cover contracts, policies, privacy, routing, handoff, CLI wiring and evidence publication using fake surfaces or Flask's test client. [pytest.ini](pytest.ini) lists the included modules. Interactive browser/model demos run separately.
+
+[Main CI run 35283225107](https://github.com/Vishnu1721/bankpilot/actions/runs/35283225107) passed for commit `0272428`: **68 tests and all six Chromium scenarios above**. This change adds ten evidence-generation regressions. The badge shows the current `main` result; the [workflow](.github/workflows/verify.yml) also runs on every PR and uploads redacted replay logs and a masked failure image. It does not call a model or simulate a human as proof of manual intervention.
+
+The [evidence index](evidence/README.md) separates the canonical model recording, current CI results and historical examples. **A fresh model recording from the final code is still required before submission.** The existing manifest names its original source commit; its files have not been relabeled as a new run.
+
+To refresh from a clean, committed checkout with the portal and model key available:
 
 ```bash
 python -m tests.test_end_to_end
+# Or: python -m tests.test_end_to_end --headless
 ```
 
-This generates `artifacts/lookup_savings_balance.json`, discovery/replay JSONL, a masked replay screenshot and a provenance manifest. Replay loads that exact file with `member_id=10024` and expects `$2150.75`. Alternatively, `python -m tests.test_discovery` followed by `python -m tests.test_replay` uses the same artifact and keeps each browser open until Enter is pressed.
+The command stages the run, checks replay success, then replaces the artifact, logs, screenshot, transcript and manifest together. The transcript comes from that run's redacted events. The manifest records the source SHA, selected model and file hashes. A missing key or failed run leaves the existing canonical evidence in place. Review and commit the generated files using the steps in the evidence index.
 
-The committed canonical recording follows the five-decision **Balance Lookup** route; a new discovery may choose the valid Member Lookup route. All canonical files and the historical exception evidence are linked in [evidence/README.md](evidence/README.md). That index distinguishes generated logs from privacy-edited transcripts and reconstructed historical logs.
+## Scope and code map
 
-The committed model run retains source SHA `a95e6580ada2991a5bf5ceb7ab00d11aaff40cc4`; it predates the latest hardening. To refresh it, run from a clean committed checkout, inspect the generated evidence and source SHA, update the redacted transcript to match the new route, then commit the files together. The script does **not** regenerate the transcript or commit files; a manifest completeness flag alone does not prove files are committed. No fresh model run is claimed by this documentation update.
-
-## Other operations and capability reuse
-
-Each discovery demo uses the running portal and a model key:
-
-| Command | Declared output | Stop point |
-| --- | --- | --- |
-| `python -m tests.test_member_discovery` | `member_name` | Member Details |
-| `python -m tests.test_balance_discovery` | `current_balance` | Balance Result |
-| `python -m tests.test_subaccount_discovery` | reviewed `account_type` | Review New Sub-account; account not opened |
-| `python -m tests.test_deposit_discovery` | reviewed `amount` | Deposit Review; funds not posted |
-
-Committed schema-1.1 artifacts are sanitized: runtime member IDs, nicknames and amounts use declared placeholders, raw goals are replaced with generic descriptions, and safe application labels/selectors remain usable. JSONL uses redaction markers rather than replacement customer identities. These examples use synthetic mock data; sanitization is not a guarantee for every unknown UI.
-
-`CapabilityRouter` and the file registry implement an optional lifecycle: approved tenant/application match → deterministic replay; draft match → approval required; no match → bounded discovery and a draft for review. Intent matching uses sanitized token similarity, not another LLM. Near misses can cause unnecessary discovery or selection of the wrong approved intent; stronger semantic constraints are future work. Router tests use fakes, including the address-change example, and do not prove arbitrary new operations work on a live site.
-
-## Verification and CI
-
-Run the complete configured non-browser suite without a portal or model key:
-
-```bash
-pytest -q tests
-```
-
-Expected: **68 passed**. [pytest.ini](pytest.ini) selects ten modules, including `test_capability_model.py`; browser/model demonstrations run separately. Four added regressions verify that fault injection reaches the current adapter and that reviewer assertions reject incorrect recovery/failure state.
-
-| Layer | Coverage | Limits |
-| --- | --- | --- |
-| 68 automated checks | Contracts, privacy/persistence guards, policies, router, CLI and handoff; fake surfaces and Flask test client. | Not live browser/model evidence. |
-| [GitHub Actions](.github/workflows/verify.yml) | Actual Chromium: two balances, member-not-found, invalid-amount preflight, injected recovery and exhausted retries. | No model API key or human operator. |
-| `tests.test_end_to_end` | Live model discovery, saved artifact, fresh-browser replay. | Requires an API key and reviewed target. |
-| `tests.test_handoff` | Human verification, preserved session, one handoff. | Interactive, outside unattended CI. |
-
-**Verified baseline:** [Actions run 35280403340](https://github.com/Vishnu1721/bankpilot/actions/runs/35280403340) passed on 2026-09-17 for PR #10 (head `46ab7f5`, tested merge snapshot `beb4052`): 64 tests and four headless assertions. This update adds four regressions and two browser fault scenarios. The badge links to the latest `main` status; inspect the PR checks for this branch's result.
-
-Interactive exception commands also remain available:
-
-```bash
-python -m tests.test_business_outcome
-python -m tests.test_recoverable_replay
-python -m tests.test_hard_failure
-python -m tests.test_handoff
-```
-
-They use the stable Member Lookup fixture `evidence/example_capability.json`, independently of whichever route discovery last recorded. Expected results are respectively `MEMBER_NOT_FOUND`, success with `recovered_steps: ["step_3"]`, `STEP_EXECUTION_FAILED` at step 3, and success after one manual verification. Browser fault injection now occurs in `tests/fault_surface.py`, where replay actually resolves targets.
-
-## Code and deliverables map
-
-| Location | Responsibility |
+| Path | Purpose |
 | --- | --- |
-| [main.py](main.py) | Evaluator CLI for goal + target discovery and parameterized replay. |
-| [src/agent/](src/agent/) | Observe → decide → act, OpenAI client, discovery budgets. |
-| [src/capability/](src/capability/) | Typed schema, recorder, checkpoint checks, deterministic executor, optional registry/router. |
-| [src/surface/](src/surface/) | Operational browser adapter; terminal helper and unimplemented desktop seam. |
-| [src/safety/](src/safety/) and [src/observability/](src/observability/) | Origin/route/action policies, untrusted UI guard, artifact checks and redacted JSONL. |
-| [src/handoff/](src/handoff/) | Preserved browser session and terminal-guided operator handoff. |
-| [artifacts/](artifacts/) and [evidence/](evidence/README.md) | Saved contracts, discovery/replay logs, masked canonical image, exception evidence and provenance. |
-| [REPORT.md](REPORT.md) | Exactly seven required sections, including concrete heterogeneity/tenant design and cuts. |
+| [main.py](main.py), [src/agent/](src/agent/) | CLI, model decisions and bounded discovery loop. |
+| [src/capability/](src/capability/) | Schema 1.1, recorder, replay, checkpoints and optional registry/router. |
+| [src/surface/](src/surface/) | Working browser adapter; desktop seam and limited terminal helper. |
+| [src/safety/](src/safety/), [src/observability/](src/observability/) | Origin/route/action checks, untrusted-UI handling, artifact privacy and JSONL redaction. |
+| [src/handoff/](src/handoff/) | Same-session operator intervention. |
+| [artifacts/](artifacts/), [evidence/](evidence/README.md) | Reusable contracts and run evidence. |
+| [REPORT.md](REPORT.md) | Architecture, schema, error handling, tenant/surface design, handoff, safety and cuts. |
 
-## Safety and scope
+Supporting discovery commands are `tests.test_member_discovery`, `tests.test_balance_discovery`, `tests.test_subaccount_discovery` and `tests.test_deposit_discovery` (run with `python -m`). Their outputs are member name, current balance, reviewed account type and reviewed amount. Sanitized artifacts use placeholders for runtime values, generic descriptions and usable application selectors.
 
-- **Policy:** exact origin (scheme/host/port), route, action and click-target checks. Discovery and replay validate link/form destinations before clicking. Financial commit routes are blocked; the mock independently returns `403`.
-- **Untrusted UI:** visible observations are normalized and capped. Suspicious instructions stop automation and request configured handoff. Step, model-call, elapsed-time and repeated-state budgets bound discovery; elapsed time is checked between calls.
-- **Verified results:** replay checks member identity, output types/completeness and final text/title/URL checkpoint. After handoff, failed extraction is reattempted. Discovery must satisfy its checkpoint before saving; unfamiliar workflows need stronger reviewed assertions than a title alone.
-- **Privacy:** JSONL masks sensitive fields/patterns with `[REDACTED]` and category-specific markers; artifacts and registry intents have separate persistence checks. Screenshot masking covers known data regions. Five obsolete unmasked mock screenshots were removed. Console output is not a sanitized evidence log.
-- **Handoff audit:** context/control owner and a safe `human_action_type` remain; free-form notes are redacted. Changed state and an operator-reported category do not prove identity or exact human actions. Runtime handoff screenshots are not committed; the evidence index identifies historical references.
+The optional registry distinguishes draft, approved and retired capabilities within a tenant/application. Direct CLI replay uses the artifact supplied by the caller; registry approval is a separate interface. Token-based matching can miss a valid intent or choose a wrong approved one, so it is not general-purpose intent understanding.
 
-Business responses (`MEMBER_NOT_FOUND`, `ACCOUNT_LOCKED`, `INVALID_INPUT`, `INVALID_AMOUNT`) return structured outcomes. Session/authentication, unexpected-dialog and verification codes request configured handoff or stop; permission denial stops without retry. Temporary application/target failures receive bounded retries. Unknown conditions can still become generic failures.
-
-This is not an arbitrary-site agent. New applications require reviewed policies, contracts, locators and extraction rules. Metadata detection and screenshot masks are heuristic; static destination checks cannot predict arbitrary JavaScript navigation. Full desktop automation, banking integrations, production authentication, cloud queues, an operator dashboard and multi-tenant infrastructure are not implemented or required for this prototype. The [report](REPORT.md) explains how those extensions would fit.
+Financial commits remain blocked. Logging and screenshot masks protect known data patterns/regions, but terminal output still shows results and needs review before sharing. Static destination checks do not cover every JavaScript redirect. Full desktop automation, real banking, production identity, queues and tenant infrastructure are intentionally out of scope; see the report for the proposed extensions.
