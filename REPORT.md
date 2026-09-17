@@ -6,21 +6,40 @@ BankPilot separates probabilistic discovery from deterministic execution. During
 
 The recorder converts the successful trace into a typed, parameterized capability. A file-backed capability registry adds tenant, application, version, intent, lifecycle state, and approver metadata. The router first searches this catalog: an approved match goes directly to replay without an LLM; a draft match stops for approval; an unknown goal requests bounded discovery. Successful discovery registers a draft rather than making new automation immediately executable. Replay validates the artifact and runtime inputs, performs its ordered steps, extracts outputs, and verifies a success condition.
 
-The local LegacyBank Credit Union portal exposes four independent workflows: member lookup, balance lookup, sub-account preparation, and deposit preparation. Browser automation is the only fully implemented execution surface. `TerminalSurface` is a restricted no-shell executable adapter, not an LLM discovery/replay implementation. `DesktopSurface` is an unimplemented accessibility-tree seam that fails closed until platform providers, foreground-application checks, and target resolution exist. These two files demonstrate extension boundaries only and should not be interpreted as partial desktop or terminal automation.
+The mock portal exposes member lookup, balance lookup, sub-account preparation, and deposit preparation. Browser automation is the only complete surface. `TerminalSurface` is a restricted no-shell adapter and `DesktopSurface` is a fail-closed accessibility-tree seam; neither is claimed as implemented automation.
+
+The executable `main.py` exposes `discover` and `replay` commands. Discovery
+accepts `--goal`, `--target`, `--artifact`, and repeatable runtime parameters;
+replay accepts a saved artifact plus new invocation parameters without an LLM
+call. Both paths use the same safety and execution engines as the demos.
 
 ## 2. Artifact schema
 
 Schema `1.1` capabilities contain identity, application, start URL, enum-constrained parameter/output types, ordered steps, targets, named extraction mappings, and an enum-constrained success condition. Runtime data is stored as placeholders such as `{{member_id}}`, preventing discovery values from becoming replay constants. Replay rejects missing, unexpected, or incorrectly typed inputs. Targets use semantic role and accessible name plus a selector fallback.
 
-Every declared output now has a matching extraction step: `lookup_member` returns `member_name`; `lookup_balance` returns `current_balance`; `prepare_new_subaccount` returns the reviewed `account_type`; and `prepare_deposit` returns the reviewed `amount`. Review-only workflows also require their review heading as the success condition, so extraction alone cannot create false success. A genuinely new workflow receives a deterministic discovered ID, no invented output contract, and a final-page checkpoint; a reviewer can refine its contract before approval. The canonical checked-in artifact is `evidence/example_capability.json`; sanitized schema-1.1 examples for all four operations are in `artifacts/`.
+Every output has a named extraction step: member name, balance, reviewed account type, or reviewed deposit amount. Review workflows also require the expected review heading, so extraction alone cannot produce success. An unfamiliar workflow receives a deterministic ID, no invented output contract, and a final-page checkpoint for reviewer refinement. Sanitized schema-1.1 examples are committed in `artifacts/` and `evidence/example_capability.json`.
+
+UI-derived target roles, accessible names, selectors, descriptions, and generic
+page-title checkpoints pass through a separate artifact metadata guard. It
+rejects runtime values and sensitive-looking identifiers, contact details,
+currency, likely person names, or control characters. Unsafe locator metadata
+is not redacted into a broken locator; recording fails closed for human review.
 
 ## 3. Determinism & error handling
 
 Replay resolves placeholders from validated inputs and dispatches directly on the recorded step type. It does not ask a model to reinterpret the goal or page. Semantic targeting is tried before the recorded selector. Successful browser calls are insufficient: replay checks expected text, exact title, or URL pattern. Discovery applies the same typed checkpoint to the current observation before accepting `finish` or saving an artifact.
 
-Expected business outcomes, transient failures, and hard failures are distinct. Verified replay of member `99999` returns `MEMBER_NOT_FOUND` immediately after the search rather than retrying extraction. The recoverable-path test injects one temporary Search Member failure at step 3, retries once, completes, and returns `recovered_steps=["step_3"]`. The hard-failure test keeps the same target unavailable, performs two bounded retries, returns `STEP_EXECUTION_FAILED` with `failed_step="step_3"`, and saves `evidence/failure_step_3.png`. A failed final condition is reported separately.
+Business outcomes, recoverable conditions, and hard failures are distinct. Member `99999` returns `MEMBER_NOT_FOUND`; a temporary target failure retries and records the recovered step; an exhausted retry returns `STEP_EXECUTION_FAILED` with step, expected/observed state, and a screenshot. Final-condition and output-contract failures have separate codes.
 
-These exceptional-path tests use the committed capability fixture rather than the artifact overwritten by live discovery. This matters because the LLM may validly choose Member Lookup or Balance Lookup for a savings goal; replay adapts extraction to the recorded route, while fault-injection tests require a stable target. Assertions enforce each intended status and prevent an ordinary successful replay from being mistaken for a successful edge-case demonstration. Discovery itself is bounded by maximum steps, LLM calls, elapsed time, observation size, and repeated identical states. Model responses are schema-validated, and the JSON parser tolerates trailing prose or an accidental second object by extracting the first valid JSON object.
+Additional runtime classifications include `PERMISSION_DENIED`,
+`SESSION_EXPIRED`, `AUTHENTICATION_REQUIRED`, `UNEXPECTED_DIALOG`,
+`ACCOUNT_LOCKED`, `VERIFICATION_FAILED`, and
+`APP_TEMPORARILY_UNAVAILABLE`. Permission errors stop without retry; session,
+authentication, dialog, and verification conditions request same-session
+handoff when configured; temporary application failures receive only bounded
+retries.
+
+Exceptional tests use a stable committed fixture because discovery may validly choose Member Lookup or Balance Lookup. Discovery is bounded by steps, model calls, elapsed time, observation size, and repeated states. Model responses are schema-validated before execution.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -35,26 +54,34 @@ base vendor capability
 = approved tenant capability version
 ```
 
-The base capability owns business semantics, parameter/output contracts, ordered actions, and generic success criteria shared across institutions using the same vendor. A tenant configuration identifies institution, allowed environments, authentication integration, and locale. The application profile declares vendor product, deployment channel, supported version range, and UI feature flags. Locator overrides replace only targets known to differ for that tenant; domain and policy overrides narrow permitted hosts, actions, amounts, roles, and approval requirements. Overrides may restrict a base policy but may not silently weaken mandatory platform controls.
+The base capability owns business semantics, contracts, actions, and success criteria. Tenant configuration supplies institution, environments, authentication and locale; an application profile supplies vendor/version and feature flags. Locator overrides replace known differences, while tenant policy may narrow but never silently weaken platform controls.
 
-The implemented registry already enforces tenant and application scope plus draft/approved/retired lifecycle states. Its matcher compares normalized privacy-safe intent terms at a fixed threshold: a near-miss below the threshold causes conservative re-discovery, while a false-positive above it could select the wrong approved capability. The prototype mitigates raw-goal persistence and tenant crossover, but production should add typed intent constraints, version compatibility, and reviewer-approved examples before execution. Tests prove an approval for tenant A is not visible to tenant B. The remaining production design records the base version, tenant overlay version, compatible vendor versions, test evidence, reviewer, and approval state. Scheduled canary replays and page fingerprints detect drift. A mismatch in application version, success condition, locator confidence, or expected page structure opens the circuit: automation stops safely, preserves evidence, and routes to a human. It never guesses through a tenant variant. Operators may select a previously approved compatible version, apply a reviewed locator override, or re-run discovery and approve a newly recorded version.
+The registry enforces tenant/application scope and draft/approved/retired states; tests prevent tenant crossover. Privacy-safe intent matching conservatively re-discovers below its threshold, though production needs typed intent constraints to reduce false positives. Base/overlay versions, supported vendor versions, reviewer and test evidence would be recorded together. Canary replay and page fingerprints detect drift; version, checkpoint or locator mismatch opens the circuit and routes to review, override, compatible rollback, or re-recording.
 
 ## 5. Escalation & handoff
 
-Member `10025` demonstrates same-session human intervention. The verified run pauses after the Search Member click at step 3, displays Manual Verification Required, and preserves the live browser. The `handoff_started` event records control owner `human`, capability ID, current step, URL, page title, reason, and `evidence/handoff_required.png`. The operator clicks Complete Verification in that browser and describes the action in the terminal. `handoff_completed` transfers ownership back to `automation`, logs the action and resulting URL, and replay extracts `$3675.20` at step 4 without rebuilding the session. The run reports exactly one handoff.
+Member `10025` demonstrates same-session human intervention. The verified run pauses after the Search Member click at step 3, displays Manual Verification Required, and preserves the live browser. The `handoff_started` event records control owner `human`, capability ID, current step, URL, page title, and reason. Each runtime handoff generates `evidence/handoff_required.png`; the committed representative completed-run screenshot is `evidence/handoff_final.png`. The operator clicks Complete Verification in that browser and describes the action in the terminal. `handoff_completed` transfers ownership back to `automation`, records a safe `human_action_type` such as `completed_manual_verification`, redacts the arbitrary operator note, and replay extracts `$3675.20` at step 4 without rebuilding the session. The run reports exactly one handoff.
 
-The same handoff manager is injectable into ordinary replay and discovery. Exhausted retries, explicit escalation, and blocked actions can transfer the preserved live session. Resume requires a nonblank description of the human action and a changed URL/title/body fingerprint; pressing Enter alone cannot claim completion. Production would replace terminal input with an authenticated operator queue, timeout and cancel controls, least-privilege context, and explicit resume authorization.
+The manager is shared by replay and discovery. Exhausted retries, escalation and blocked actions can transfer the live session. Resume requires a nonblank operator note and changed URL/title/body fingerprint; `/cancel` terminates and records a safe audit category. Production would add an authenticated operator queue, timeouts and explicit resume authorization.
+
+Observation-guard blocks, including prompt-injection-like UI content, use this
+same path when a handoff manager is attached. The model is not called with the
+blocked observation.
 
 ## 6. Safety
 
-Rendered page text, labels, values, notifications, errors, and element names are untrusted input. The observation guard considers only visible controls and rendered body text, removes control characters, normalizes whitespace, caps text and element counts, labels the envelope `untrusted_ui_data`, and escalates on common prompt-injection patterns. Trusted policy remains in the system message. Pattern matching is defense in depth; authoritative controls remain outside the model.
+All rendered text, labels, values and errors are untrusted. The guard uses visible controls and body text, removes control characters, normalizes and caps content, labels it `untrusted_ui_data`, and escalates suspicious instructions. Authoritative policy remains outside the model.
 
 Discovery and replay require an approved host plus a route-specific action policy. Each route declares allowed action kinds and exact clickable targets, so generic wording such as “Proceed” grants no authority. Consequential routes and targets are not allowlisted; the mock commit endpoints independently return HTTP `403`. Terminal execution uses `shell=False` and an executable allowlist.
+
+Discovery resolves a click's destination before recording or executing it and
+checks that URL against the exact origin and route policy. This closes the gap
+where an approved link label could be changed to point outside the allowlist.
 
 The logger recursively redacts sensitive fields and patterns inside arbitrary strings, including member-number, currency, SSN, and person-name patterns. Screenshot capture masks form controls and common result, notice, and error regions. Production should add institution-specific classification, encrypted evidence storage, retention policy, and access auditing.
 
 ## 7. Cuts
 
-This is a safe sandbox prototype, not production banking software. Phase one implements capability routing, approval lifecycle, and tenant isolation using JSON files. Real authentication, core-banking connectors, regulated customer storage, actual account commitment, database-backed multi-tenancy, cloud queues, an operator web console, centralized telemetry, full desktop drivers, and screenshot-coordinate control remain future phases. Financial commitment remains blocked until authenticated roles, dual approval, idempotency, and immutable audit controls exist. Terminal support is not yet part of LLM discovery; risk classification is conservative keyword policy; and extraction handles labeled table rows rather than arbitrary documents.
+This is a sandbox prototype. Real authentication, banking connectors, regulated storage, commitments, database-backed tenancy, queues, operator console, centralized telemetry, desktop drivers and coordinate control are deferred. Financial commitment stays blocked pending authenticated roles, dual approval, idempotency and immutable audit. Terminal discovery is absent; risk classification is conservative; extraction targets labeled table rows.
 
-Broad `pytest -q tests` collection reports 37 passing regression tests, including the single-output inference case in `test_capability_model.py`; interactive browser demonstrations are intentionally outside pytest collection and retain their `python -m ...` entry points. Verified scripted checks also report 5/5 security boundaries, 8/8 hardening checks, 5/5 submission-gap checks, 4/4 portal behaviors, 5/5 output contracts, and 3/3 router lifecycle tests. A failed extraction is retried after handoff; if it still fails, replay returns `STEP_EXECUTION_FAILED`. Final success independently requires every declared output, so a changed page cannot produce `success` with an empty output object. Unfamiliar discovery never copies raw goal text or unmatched typed values into an artifact. The complete canonical evidence set is committed: the model-driven Member Lookup discovery log, its generated savings-balance artifact, the deterministic replay log, the redacted replay screenshot, and a matching privacy-redacted transcript. The evidence can be inspected without an API key; independently rerunning model-driven discovery still requires the evaluator's own key.
+`pytest -q tests` reports 64 passing checks, including parameterized CLI wiring and cancellation tests using explicit fakes. A configurable headless checker accepts reviewer-supplied artifacts, inputs and expected results; CI exercises two members, not-found and invalid-amount outcomes without an LLM. Runtime extraction reads the page, not the expected fixture values. Browser/model runs are separate from unit checks. Committed model evidence retains its original source provenance; a fresh post-merge discovery needs an API key. Metadata privacy detection is heuristic and static destinations cannot predict arbitrary JavaScript navigation; production needs stronger classification and browser-level enforcement.

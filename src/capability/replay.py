@@ -1,5 +1,6 @@
 import json
 import re
+from src.handoff.manager import HandoffCancelled
 from pathlib import Path
 
 from src.capability.models import (
@@ -29,6 +30,15 @@ class OutputContractError(RuntimeError):
 
 class IdentityMismatchError(RuntimeError):
     """Raised when returned customer data belongs to another member."""
+
+
+class RuntimeConditionError(RuntimeError):
+    """A classified runtime condition with an explicit retry policy."""
+
+    def __init__(self, code, message, retryable=False):
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
 
 
 class ReplayEngine:
@@ -113,11 +123,7 @@ class ReplayEngine:
 
             business_result = self._validate_business_inputs(capability, inputs)
             if business_result:
-                self.logger.log(
-                    "business_outcome",
-                    code=business_result.code,
-                    message=business_result.message,
-                )
+                self._log_outcome(business_result)
                 return business_result
 
             self.safety.check_url(
@@ -162,14 +168,7 @@ class ReplayEngine:
                 )
 
                 if business_result:
-                    self.logger.log(
-                        "business_outcome",
-                        code=business_result.code,
-                        message=(
-                            business_result.message
-                        )
-                    )
-
+                    self._log_outcome(business_result)
                     return business_result
 
                 try:
@@ -203,6 +202,16 @@ class ReplayEngine:
                         "replay_failed",
                         code=result.code,
                         failed_step=step.step_id,
+                        message=result.message,
+                        evidence_path=result.evidence_path,
+                    )
+                    return result
+                except RuntimeConditionError as error:
+                    result = self._failure_result(step, error)
+                    self.logger.log(
+                        "replay_failed",
+                        code=result.code,
+                        failed_step=result.failed_step,
                         message=result.message,
                         evidence_path=result.evidence_path,
                     )
@@ -270,14 +279,7 @@ class ReplayEngine:
                 )
 
                 if business_result:
-                    self.logger.log(
-                        "business_outcome",
-                        code=business_result.code,
-                        message=(
-                            business_result.message
-                        )
-                    )
-
+                    self._log_outcome(business_result)
                     return business_result
 
             try:
@@ -390,12 +392,14 @@ class ReplayEngine:
             self.max_retries + 2
         ):
             try:
+                self._raise_transient_application_state()
                 self._execute_step(
                     step,
                     capability,
                     inputs,
                     outputs
                 )
+                self._raise_transient_application_state()
 
                 if attempt > 1:
                     print(
@@ -409,37 +413,29 @@ class ReplayEngine:
 
             except (SafetyViolation, IdentityMismatchError):
                 raise
+            except RuntimeConditionError as error:
+                if not error.retryable:
+                    raise
+                last_error = error
             except Exception as error:
                 last_error = error
 
-                if (
-                    attempt
-                    > self.max_retries
-                ):
-                    break
+            if attempt > self.max_retries:
+                break
 
-                print(
-                    "Recoverable condition "
-                    f"at {step.step_id}: "
-                    f"{error}"
-                )
-
-                print(
-                    f"Retrying "
-                    f"({attempt}/"
-                    f"{self.max_retries})..."
-                )
-
-                self.logger.log(
-                    "step_retry",
-                    step_id=step.step_id,
-                    attempt=attempt,
-                    error=str(error)
-                )
-
-                self.surface.wait(
-                    self.retry_delay_ms
-                )
+            print(
+                "Recoverable condition "
+                f"at {step.step_id}: "
+                f"{last_error}"
+            )
+            print(f"Retrying ({attempt}/{self.max_retries})...")
+            self.logger.log(
+                "step_retry",
+                step_id=step.step_id,
+                attempt=attempt,
+                error=str(last_error)
+            )
+            self.surface.wait(self.retry_delay_ms)
 
         raise last_error
 
@@ -549,6 +545,16 @@ class ReplayEngine:
     ):
         if self.handoff_manager and self.handoff_manager.requires_handoff():
             self._perform_handoff("The application requires manual verification.")
+
+        consume_dialog = getattr(self.surface, "consume_unexpected_dialog", None)
+        dialog_message = consume_dialog() if consume_dialog else None
+        if dialog_message:
+            return self._handoff_or_failure(
+                "UNEXPECTED_DIALOG",
+                "An unexpected browser dialog interrupted replay.",
+                handoff_reason="An unexpected browser dialog requires review.",
+            )
+
         validation_errors = self.surface.validation_errors() if include_validation else []
         if validation_errors:
             return ReplayResult(
@@ -558,9 +564,53 @@ class ReplayEngine:
                 message="; ".join(validation_errors),
                 recovered_steps=self.recovered_steps,
             )
-        body_text = (
-            self.surface.body_text()
-        )
+        body_text = self.surface.body_text()
+        normalized = " ".join(body_text.lower().split())
+
+        if "session expired" in normalized or "session has expired" in normalized:
+            return self._handoff_or_failure(
+                "SESSION_EXPIRED",
+                "The authenticated session expired.",
+                handoff_reason="The session expired and must be restored manually.",
+            )
+
+        if any(
+            marker in normalized
+            for marker in ("authentication required", "sign in required", "login required")
+        ):
+            return self._handoff_or_failure(
+                "AUTHENTICATION_REQUIRED",
+                "Authentication is required before replay can continue.",
+                handoff_reason="Authentication is required to continue replay.",
+            )
+
+        if any(
+            marker in normalized
+            for marker in ("permission denied", "access denied", "not authorized", "forbidden")
+        ):
+            return self._runtime_failure(
+                "PERMISSION_DENIED",
+                "The current operator is not authorized for this operation.",
+            )
+
+        if "account locked" in normalized:
+            return ReplayResult(
+                status=ReplayStatus.BUSINESS_OUTCOME,
+                outputs={},
+                code="ACCOUNT_LOCKED",
+                message="Account locked",
+                recovered_steps=self.recovered_steps,
+            )
+
+        if any(
+            marker in normalized
+            for marker in ("member verification failed", "verification failed")
+        ):
+            return self._handoff_or_failure(
+                "VERIFICATION_FAILED",
+                "Member verification failed.",
+                handoff_reason="Member verification failed and requires human review.",
+            )
 
         if (
             "Member not found"
@@ -586,6 +636,46 @@ class ReplayEngine:
 
         return None
 
+    def _raise_transient_application_state(self):
+        normalized = " ".join(self.surface.body_text().lower().split())
+        if any(
+            marker in normalized
+            for marker in (
+                "temporarily unavailable",
+                "service unavailable",
+                "try again later",
+            )
+        ):
+            raise RuntimeConditionError(
+                "APP_TEMPORARILY_UNAVAILABLE",
+                "The application is temporarily unavailable.",
+                retryable=True,
+            )
+
+    def _handoff_or_failure(self, code, message, handoff_reason):
+        if self.handoff_manager is not None:
+            self._perform_handoff(handoff_reason)
+            return None
+        return self._runtime_failure(code, message)
+
+    def _runtime_failure(self, code, message):
+        return ReplayResult(
+            status=ReplayStatus.FAILURE,
+            outputs={},
+            code=code,
+            message=message,
+            failed_step=self.current_step_id,
+            recovered_steps=self.recovered_steps,
+        )
+
+    def _log_outcome(self, result):
+        event = (
+            "business_outcome"
+            if result.status == ReplayStatus.BUSINESS_OUTCOME
+            else "replay_failed"
+        )
+        self.logger.log(event, code=result.code, message=result.message)
+
     def _perform_handoff(self, reason):
         self.handoff_count += 1
         context = {
@@ -595,7 +685,12 @@ class ReplayEngine:
             "page_title": self.surface.page_title(),
         }
         self.logger.log("handoff_started", reason=reason, control_owner="human", **context)
-        result = self.handoff_manager.handoff(reason=reason, context=context)
+        try:
+            result = self.handoff_manager.handoff(reason=reason, context=context)
+        except HandoffCancelled:
+            self.logger.log("handoff_cancelled", control_owner="human",
+                            human_action_type="terminated_run", **context)
+            raise
         self.logger.log(
             "handoff_completed",
             handoff_number=self.handoff_count,
@@ -605,6 +700,9 @@ class ReplayEngine:
             url=self.surface.current_url(),
             screenshot=result["screenshot"],
             human_action=result["human_action"],
+            human_action_type=result.get(
+                "human_action_type", "completed_manual_intervention"
+            ),
         )
 
     def _failure_result(
@@ -630,7 +728,11 @@ class ReplayEngine:
         return ReplayResult(
             status=ReplayStatus.FAILURE,
             outputs={},
-            code="STEP_EXECUTION_FAILED",
+            code=(
+                error.code
+                if isinstance(error, RuntimeConditionError)
+                else "STEP_EXECUTION_FAILED"
+            ),
             message=str(error),
             failed_step=step.step_id,
             expected=(

@@ -6,6 +6,7 @@ from src.capability.checkpoint import verify_observation_checkpoint
 from src.observability.logger import EventLogger
 from src.safety.observation import UntrustedObservationGuard
 from src.safety.policy import SafetyPolicy, SafetyViolation
+from src.handoff.manager import HandoffCancelled
 
 
 class DiscoveryAgent:
@@ -68,7 +69,22 @@ class DiscoveryAgent:
                 print(f"\n--- Step {step_number} ---")
 
                 raw_observation = self.surface.observe()
-                observation = self.observation_guard.sanitize(raw_observation)
+                try:
+                    observation = self.observation_guard.sanitize(raw_observation)
+                except SafetyViolation as error:
+                    self.logger.log(
+                        "observation_blocked",
+                        step=step_number,
+                        reason=str(error),
+                    )
+                    if self.handoff_manager is None:
+                        raise
+                    self._handoff(
+                        f"Untrusted UI observation was blocked at step "
+                        f"{step_number}: {error}",
+                        step_number,
+                    )
+                    continue
                 self.safety.check_url(observation.url)
                 budget.record_observation(observation)
 
@@ -96,6 +112,18 @@ class DiscoveryAgent:
                 )
                 try:
                     self.safety.check_action(action, observation)
+                    if action.action == ActionType.CLICK:
+                        try:
+                            destination = self.surface.action_destination(
+                                action, observation
+                            )
+                        except Exception as error:
+                            raise SafetyViolation(
+                                "Click blocked because its navigation destination "
+                                "could not be resolved safely."
+                            ) from error
+                        if destination:
+                            self.safety.check_url(destination)
                 except SafetyViolation as error:
                     if self.handoff_manager is None:
                         raise
@@ -187,11 +215,19 @@ class DiscoveryAgent:
             "page_title": self.surface.page.title(),
         }
         self.logger.log("handoff_started", reason=reason, control_owner="human", **context)
-        result = self.handoff_manager.handoff(reason=reason, context=context)
+        try:
+            result = self.handoff_manager.handoff(reason=reason, context=context)
+        except HandoffCancelled:
+            self.logger.log("handoff_cancelled", control_owner="human",
+                            human_action_type="terminated_run", **context)
+            raise
         self.logger.log(
             "handoff_completed",
             control_owner="automation",
             human_action=result["human_action"],
+            human_action_type=result.get(
+                "human_action_type", "completed_manual_intervention"
+            ),
             screenshot=result["screenshot"],
             url=self.surface.page.url,
             step_id=context["step_id"],

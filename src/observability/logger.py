@@ -6,6 +6,10 @@ from pathlib import Path
 
 class EventLogger:
 
+    SAFE_STRUCTURED_KEYS = {
+        "human_action_type",
+    }
+
     SENSITIVE_KEYS = {
         "password",
         "secret",
@@ -70,7 +74,9 @@ class EventLogger:
                     key.lower()
                 )
 
-                if any(
+                if normalized_key in self.SAFE_STRUCTURED_KEYS:
+                    result[key] = self._redact(item)
+                elif any(
                     sensitive
                     in normalized_key
                     for sensitive
